@@ -266,6 +266,29 @@ function databaseRows(players, statColumns) {
   });
 }
 
+function databaseCompactSummary(players, visiblePlayers) {
+  const counts = databaseStatusCounts(players);
+  const confidence = Math.round((state.importReport?.coverage || 0) * 100);
+  const role = state.importReport?.detectedRole || "Import";
+  const avgScore = mean(visiblePlayers.map((item) => item.bestScore));
+  const valueFlags = visiblePlayers.filter((item) => item.dealFlag === "Great value" || item.dealFlag === "FREE - bargain").length;
+  const missing = state.importReport?.missingFields?.length || 0;
+  return `<section class="database-compact-summary" aria-label="Database summary">
+    <article><span>Import</span><strong>${escapeHtml(role)} ${confidence}%</strong></article>
+    <article><span>Players</span><strong>${visiblePlayers.length}</strong></article>
+    <article><span>Avg score</span><strong>${fmt(avgScore)}</strong></article>
+    <article><span>Value flags</span><strong>${valueFlags}</strong></article>
+    <article><span>Saved / scout</span><strong>${counts.Saved} / ${counts.Scout}</strong></article>
+    <article><span>Checks</span><strong>${missing ? `${missing} missing` : "Matched"}</strong></article>
+  </section>`;
+}
+
+function databaseToolDrawer(statOptions, leaderRows, selectedStat) {
+  return `<details class="database-tool-drawer">
+    <summary><span>Views and stat leaders</span><strong>${state.databaseViews.length} saved views / ${leaderRows.length} leaders</strong></summary>
+    ${databaseUtilityPanels(statOptions, leaderRows, selectedStat)}
+  </details>`;
+}
 function databaseBoard(players) {
   const counts = databaseStatusCounts(players);
   const active = players.length - counts.Ignore;
@@ -508,8 +531,8 @@ function sampleCsv() {
       Division: "English Premier Division",
       Mins: 2100,
       Age: 22,
-      "Actual Value (£)": 2500000,
-      "Actual Wage (£/wk)": 18000,
+      "Actual Value (ï¿½)": 2500000,
+      "Actual Wage (ï¿½/wk)": 18000,
       "Goals Per 90": 0.52,
       "Non Penalty xGoals Per 90": 0.34,
       "xGoals Per Shot": 0.13,
@@ -533,8 +556,8 @@ function sampleCsv() {
       Division: "Italian Serie A",
       Mins: 2800,
       Age: 24,
-      "Actual Value (£)": 4200000,
-      "Actual Wage (£/wk)": 24000,
+      "Actual Value (ï¿½)": 4200000,
+      "Actual Wage (ï¿½/wk)": 24000,
       "Average Rating": 7.02,
       "Headers Won %": 0.71,
       "Headers Won Per 90": 5.4,
@@ -566,7 +589,10 @@ function download(filename, text) {
   URL.revokeObjectURL(url);
 }
 
-function renderShell(content) {
+function renderShell(content, options = {}) {
+  const showControls = options.showControls ?? state.activeTab !== "Import";
+  const showImportReport = options.showImportReport ?? state.activeTab !== "Import";
+  const workspaceClass = options.workspaceClass ? ` workspace-${options.workspaceClass}` : "";
   app.innerHTML = `
     <header class="app-header">
       <div class="brand-block">
@@ -586,9 +612,9 @@ function renderShell(content) {
       </div>
       <aside class="credits-bar">Spreadsheet by <a href="https://x.com/MattFitz94" target="_blank" rel="noopener noreferrer">Matt Fitzgerald</a> and <a href="https://x.com/Thecultof" target="_blank" rel="noopener noreferrer">Jack</a> from <a href="https://www.youtube.com/@TheCultofFM" target="_blank" rel="noopener noreferrer">TheCultofFM</a>; additional ideas from <a href="https://x.com/nstntly" target="_blank" rel="noopener noreferrer">Willum</a></aside>
     </header>
-    <main class="workspace">
-      ${state.activeTab !== "Import" ? controls() : ""}
-      ${state.activeTab !== "Import" ? importReportCard(state.importReport) : ""}
+    <main class="workspace${workspaceClass}">
+      ${showControls ? controls() : ""}
+      ${showImportReport ? importReportCard(state.importReport) : ""}
       ${content}
     </main>
   `;
@@ -813,10 +839,8 @@ function renderPlayerDatabase() {
   const noteCount = basePlayers.filter((player) => scoutRecord(player.id).notes).length;
 
   renderShell(`
-    ${stats()}
-    ${databaseBoard(basePlayers)}
-    ${databaseUtilityPanels(statOptions, leaderRows, selectedLeaderStat)}
-    <section class="panel database-panel">
+    ${databaseCompactSummary(basePlayers, databasePlayers)}
+    <section class="panel database-panel compact-database-panel">
       <div class="panel-head">
         <div><span>Master scouting pool</span><h2>Player Database</h2></div>
         <div class="toolbar">
@@ -861,9 +885,10 @@ function renderPlayerDatabase() {
       </div>
       <div class="selected-stats">${selectedChips || `<span>No stats selected.</span>`}</div>
       <div class="database-summary"><strong>${rows.length}</strong> of ${divisionPlayers.length} players shown / ${selectedStats.length} stat columns / ${noteCount} saved notes</div>
+      ${databaseToolDrawer(statOptions, leaderRows, selectedLeaderStat)}
       ${table(rows, columns, "database-table", { filterableColumns, filters: state.databaseFilters, openFilter: state.openDatabaseFilter })}
     </section>
-  `);
+  `, { showImportReport: false, workspaceClass: "database" });
   bindTable();
   bindDatabaseControls(rows, columns);
 }
@@ -1113,52 +1138,3 @@ function render() {
   else renderModel();
 }
 render();
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

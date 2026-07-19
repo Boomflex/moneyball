@@ -1095,6 +1095,191 @@ tbody tr:hover {
 }
 
 
+.workspace-database {
+  gap: 10px;
+  padding-top: 12px;
+}
+
+.workspace-database .controls {
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 12px;
+}
+
+.workspace-database .controls > label {
+  min-width: 138px;
+}
+
+.workspace-database .range-filter {
+  min-width: 154px;
+  gap: 5px;
+  padding: 7px 9px;
+  border-radius: 10px;
+}
+
+.workspace-database .range-filter.age-filter {
+  min-width: 220px;
+}
+
+.workspace-database input,
+.workspace-database select {
+  min-height: 34px;
+  padding-block: 6px;
+}
+
+.database-compact-summary {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.database-compact-summary article {
+  min-width: 0;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(10, 16, 15, .78);
+}
+
+.database-compact-summary span {
+  display: block;
+  overflow: hidden;
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.database-compact-summary strong {
+  display: block;
+  margin-top: 4px;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compact-database-panel {
+  padding: 12px;
+}
+
+.compact-database-panel .panel-head {
+  margin-bottom: 8px;
+}
+
+.compact-database-panel .database-views {
+  margin-bottom: 8px;
+}
+
+.compact-database-panel .database-tools {
+  margin-bottom: 6px;
+}
+
+.compact-database-panel .database-scout-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: end;
+}
+
+.compact-database-panel .database-scout-tools label {
+  flex: 1 1 126px;
+  max-width: 180px;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.compact-database-panel .database-scout-tools label:nth-child(5) {
+  flex-basis: 220px;
+  max-width: 280px;
+}
+
+.compact-database-panel .database-scout-tools select,
+.compact-database-panel .database-scout-tools input {
+  min-height: 32px;
+  padding-block: 5px;
+  font-size: 12px;
+  text-transform: none;
+}
+
+.compact-database-panel .database-actions {
+  flex: 0 0 auto;
+  gap: 6px;
+}
+
+.compact-database-panel .database-actions button {
+  min-height: 32px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.compact-database-panel .selected-stats {
+  max-height: 30px;
+  gap: 6px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.compact-database-panel .stat-chip {
+  min-height: 24px;
+  padding: 3px 7px;
+  font-size: 11px;
+}
+
+.compact-database-panel .database-summary {
+  margin-bottom: 6px;
+  font-size: 11px;
+}
+
+.compact-database-panel .table-wrap {
+  border-radius: 12px;
+}
+
+.compact-database-panel .database-table th,
+.compact-database-panel .database-table td {
+  padding: 7px 9px;
+}
+
+.database-tool-drawer {
+  margin: 8px 0;
+  padding: 0;
+  border-radius: 12px;
+}
+
+.database-tool-drawer > summary {
+  min-height: 40px;
+  padding: 9px 11px;
+  color: var(--ink);
+}
+
+.database-tool-drawer > summary span {
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.database-tool-drawer > summary strong {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.database-tool-drawer[open] {
+  padding-bottom: 12px;
+}
+
+.database-tool-drawer[open] .database-utility-grid {
+  padding: 0 11px;
+}
 .database-utility-grid {
   display: grid;
   grid-template-columns: minmax(360px, .62fr) minmax(520px, 1fr);
@@ -1408,6 +1593,7 @@ tbody tr:hover {
 
   .stats,
   .database-board,
+  .database-compact-summary,
   .import-report {
     grid-template-columns: repeat(2, minmax(150px, 1fr));
   }
@@ -1452,6 +1638,7 @@ tbody tr:hover {
 
   .stats,
   .database-board,
+  .database-compact-summary,
   .import-report,
   .hero-metrics {
     grid-template-columns: 1fr;
@@ -1486,23 +1673,3 @@ tbody tr:hover {
     min-height: 340px;
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
