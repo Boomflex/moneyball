@@ -570,7 +570,7 @@ function renderShell(content) {
   app.innerHTML = `
     <header class="app-header">
       <div class="brand-block">
-        <div class="brand-mark">MB</div>
+        <div class="brand-mark"><img src="assets/moneyballlogo.png" alt="Moneyball logo" /></div>
         <div>
           <span>Moneyball</span>
           <strong>Recruitment Desk</strong>
@@ -1113,6 +1113,7 @@ function render() {
   else renderModel();
 }
 render();
+
 
 
 
