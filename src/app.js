@@ -1092,7 +1092,7 @@ function renderSquadPlanner() {
       </div>
       ${table(rows, ["role", "squadCount", "squadBest", "squadBestScore", "candidates", "savedCount", "scoutCount", "watchCount", "greatValueCount", "topCandidate", "bestRole", "bestScore", "scoreGap", "avgScore", "action"], "planner-table")}
     </section>
-  `);
+  `, { showControls: false, showImportReport: false });
   bindTable();
   bindSquadPlannerControls();
 }
