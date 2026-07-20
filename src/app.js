@@ -1062,7 +1062,7 @@ function renderSquadPlanner() {
   const savedDate = squad?.savedAt ? new Date(squad.savedAt).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }) : "Not saved";
   renderShell(`
     <section class="squad-baseline-grid">
-      <section class="panel squad-upload-panel">
+      <section class="squad-baseline-strip">
         <div class="panel-head compact"><div><span>Current squad baseline</span><h2>Saved Squad</h2></div></div>
         <div class="squad-summary">
           <article><span>Rows</span><strong>${squad?.rows.length || 0}</strong></article>

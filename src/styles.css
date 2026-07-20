@@ -1526,51 +1526,69 @@ tbody tr:hover {
 
 .squad-baseline-grid {
   display: grid;
-  grid-template-columns: minmax(340px, 360px) 1fr;
+  grid-template-columns: 1fr;
   gap: 12px;
   align-items: start;
 }
 
-.squad-upgrade-panel {
-  grid-column: 1 / -1;
+.squad-baseline-strip {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 2px 2px 6px;
+}
+
+.squad-baseline-strip .panel-head {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.squad-baseline-strip .panel-head h2 {
+  font-size: 17px;
 }
 
 .squad-summary {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(120px, 1fr));
-  gap: 8px;
-  margin: 10px 0;
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin: 0;
 }
 
 .squad-summary article {
   min-width: 0;
-  padding: 9px 10px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: rgba(6, 10, 9, .72);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .squad-summary span {
-  display: block;
+  display: inline;
   color: var(--accent);
   font-size: 10px;
   font-weight: 900;
   letter-spacing: .08em;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .squad-summary strong {
-  display: block;
-  margin-top: 4px;
+  display: inline;
   overflow: hidden;
   color: var(--ink);
-  font-size: 18px;
+  font-size: 15px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .squad-upload-actions {
-  margin: 8px 0 10px;
+  flex: 0 0 auto;
+  margin: 0;
 }
 
 .upgrade-table {
