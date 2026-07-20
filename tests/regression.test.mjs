@@ -24,6 +24,10 @@ const EXPORTS = {
     path: "C:/Users/jakek/OneDrive/Documents/Sports Interactive/Football Manager 26/FM26PlayerExport by vinteset/Exports CSV/moneyball_export_20260719_134047.csv",
     expected: { rowCount: 8, importRole: "CB", coverage: 93.3, entries: 8, positionMatched: true, top: { player: "Kennie Cockburn", role: "CB", bestRole: "Stopper", bestScore: 26.7, totalVfm: 1.5, valueRatio: null, dealFlag: "No league data" } },
   },
+  MixedBestPos: {
+    path: "C:/Users/jakek/OneDrive/Documents/Sports Interactive/Football Manager 26/FM26PlayerExport by vinteset/Exports CSV/moneyball_export_20260720_095224.csv",
+    expected: { rowCount: 160, importRole: null, locked: false, coverage: 100, entries: 182, positionMatched: true, roleCounts: { MID: 64, Winger: 39, CB: 36, FB: 23, Striker: 20 } },
+  },
   CM: {
     path: "C:/Users/jakek/OneDrive/Documents/Sports Interactive/Football Manager 26/FM26PlayerExport by vinteset/Exports CSV/moneyball_export_20260718_152255.csv",
     expected: { rowCount: 213, importRole: "MID", entries: 213, top: { player: "Rob Leather", role: "MID", bestRole: "CAM", bestScore: 44.1, totalVfm: 3.5, valueRatio: 2.3, dealFlag: "Great value" } },
@@ -58,19 +62,25 @@ for (const [name, fixture] of Object.entries(EXPORTS)) {
 
   assert.equal(rows.length, fixture.expected.rowCount, `${name} row count changed`);
   assert.equal(importRole.id, fixture.expected.importRole, `${name} detected role changed`);
-  assert.equal(importRole.locked, true, `${name} should be locked by export shape or position`);
+  assert.equal(importRole.locked, fixture.expected.locked ?? true, `${name} lock state changed`);
   assert.equal(round1(importRole.coverage * 100), fixture.expected.coverage ?? 100, `${name} header coverage changed`);
   assert.equal(report.detectedRole, fixture.expected.importRole, `${name} report detected role changed`);
   if (fixture.expected.positionMatched) assert.equal(importRole.positionMatched, true, `${name} should be detected from FM position`);
   assert.equal(players.length, fixture.expected.entries, `${name} role entry count changed`);
+  if (fixture.expected.roleCounts) {
+    const roleCounts = Object.fromEntries(MODEL.roles.map((role) => [role.id, players.filter((player) => player.role === role.id).length]).filter(([, count]) => count));
+    assert.deepEqual(roleCounts, fixture.expected.roleCounts, `${name} role mix changed`);
+  }
 
-  assert.equal(top.player, fixture.expected.top.player, `${name} top player changed`);
-  assert.equal(top.role, fixture.expected.top.role, `${name} top role changed`);
-  assert.equal(top.bestRole, fixture.expected.top.bestRole, `${name} top role fit changed`);
-  assert.equal(round1(top.bestScore), fixture.expected.top.bestScore, `${name} top score changed`);
-  assert.equal(round1(top.totalVfm), fixture.expected.top.totalVfm, `${name} top total VFM changed`);
-  assert.equal(round1(top.valueRatio), fixture.expected.top.valueRatio, `${name} top value ratio changed`);
-  assert.equal(top.dealFlag, fixture.expected.top.dealFlag, `${name} top deal flag changed`);
+  if (fixture.expected.top) {
+    assert.equal(top.player, fixture.expected.top.player, `${name} top player changed`);
+    assert.equal(top.role, fixture.expected.top.role, `${name} top role changed`);
+    assert.equal(top.bestRole, fixture.expected.top.bestRole, `${name} top role fit changed`);
+    assert.equal(round1(top.bestScore), fixture.expected.top.bestScore, `${name} top score changed`);
+    assert.equal(round1(top.totalVfm), fixture.expected.top.totalVfm, `${name} top total VFM changed`);
+    assert.equal(round1(top.valueRatio), fixture.expected.top.valueRatio, `${name} top value ratio changed`);
+    assert.equal(top.dealFlag, fixture.expected.top.dealFlag, `${name} top deal flag changed`);
+  }
 
   if (name === "GK") {
     assert.ok(report.derivedFields.some((field) => field.includes("Save Ability")), "GK import should report Save Ability per-90 derivation");

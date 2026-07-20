@@ -3,8 +3,10 @@ import { mean, normalise, roleIdsFromPositionText } from "./utils.js";
 export const HEADER_ALIASES = new Map(Object.entries({
   "mins": ["Minutes"],
   "playername": ["Player", "Name"],
-  "actualvalue": ["Transfer Value", "Value", "Actual Value (£)"],
-  "actualwagewk": ["Wage", "Salary", "Actual Wage (£/wk)"],
+  "bestposition": ["Best Pos", "Best Role", "Primary Position"],
+  "otherpositions": ["Other Pos", "Other Position", "Secondary Positions"],
+  "actualvalue": ["Transfer Value", "Value", "Actual Value (\u00a3)"],
+  "actualwagewk": ["Wage", "Salary", "Actual Wage (\u00a3/wk)"],
   "averagerating": ["Rating"],
   "clearancesper90": ["Clearances per 90", "Clearences Per 90"],
   "clearencesper90": ["Clearances per 90"],

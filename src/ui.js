@@ -43,6 +43,11 @@ export function flagClass(value) {
   return "flag";
 }
 
+export function upgradeClass(value) {
+  if (value === "Clear upgrade" || value === "Possible upgrade" || value === "Squad gap") return "flag good";
+  if (value === "Depth only") return "flag bad";
+  return "flag";
+}
 export function labelFor(col) {
   return {
     totalVfm: "TOTAL VFM",
@@ -63,7 +68,18 @@ export function labelFor(col) {
     scoutCount: "Scout",
     watchCount: "Watch",
     greatValueCount: "Value flags",
+    squadCount: "Squad",
+    squadBest: "Squad best",
+    squadBestScore: "Squad score",
     topCandidate: "Top candidate",
+    squadPlayer: "Squad player",
+    squadScore: "Squad score",
+    candidate: "Candidate",
+    candidateScore: "Candidate score",
+    scoreGap: "Score gap",
+    candidateDivision: "Division",
+    candidateValue: "Value",
+    upgradeCall: "Upgrade call",
     avgScore: "Avg score",
     action: "Action",
     leaderValue: "Value",
@@ -95,9 +111,9 @@ export function formatCell(row, col) {
   if (col === "priority") return priorityCell(row, value);
   if (col === "notes") return notesCell(row, value);
   if (col.startsWith("stat:")) return formatStatCell(value);
-  if (["actualValue", "expectedValue", "actualWage", "expectedWage"].includes(col)) return value ? money.format(value) : "";
-  if (["bestScore", "totalVfm", "valueRatio", "wageRatio", "strength"].includes(col)) return value === null || value === undefined ? "" : fmt(value);
-  if (["player", "dealFlag", "archetype"].includes(col)) return `<span class="${col === "dealFlag" ? flagClass(value) : ""}">${escapeHtml(value ?? "")}</span>`;
+  if (["actualValue", "expectedValue", "actualWage", "expectedWage", "candidateValue"].includes(col)) return value ? money.format(value) : "";
+  if (["bestScore", "totalVfm", "valueRatio", "wageRatio", "strength", "squadBestScore", "squadScore", "candidateScore", "scoreGap", "avgScore"].includes(col)) return value === null || value === undefined ? "" : fmt(value);
+  if (["player", "dealFlag", "archetype", "upgradeCall"].includes(col)) return `<span class="${col === "dealFlag" ? flagClass(value) : col === "upgradeCall" ? upgradeClass(value) : ""}">${escapeHtml(value ?? "")}</span>`;
   return escapeHtml(value ?? "");
 }
 

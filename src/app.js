@@ -17,6 +17,7 @@ import { fmt, formatStatValue, importReportCard, labelFor, metricCompare, player
 
 const SCOUT_STORAGE_KEY = "moneyball.scoutRecords.v1";
 const DATABASE_VIEWS_STORAGE_KEY = "moneyball.databaseViews.v1";
+const SQUAD_STORAGE_KEY = "moneyball.squadBaseline.v1";
 const DATABASE_STATUSES = ["New", "Watch", "Scout", "Saved", "Ignore"];
 const DATABASE_PRIORITIES = ["", "A", "B", "C"];
 
@@ -55,6 +56,7 @@ const state = {
   databaseDeal: "All",
   scoutRecords: loadScoutRecords(),
   databaseViews: loadDatabaseViews(),
+  squadBaseline: loadSquadBaseline(),
   databaseViewName: "",
   databaseSavedView: "",
   leaderStat: "",
@@ -153,6 +155,49 @@ function saveDatabaseViews() {
   } catch {
     // Saved views are a browser convenience and do not affect workbook scoring.
   }
+}
+function buildSquadBaseline(rows, metadata = {}) {
+  const importRole = inferImportRole(rows, roles);
+  return {
+    name: metadata.name || "Current squad",
+    savedAt: metadata.savedAt || new Date().toISOString(),
+    rows,
+    importRole: importRole.id,
+    importRoleLocked: importRole.locked,
+    importReport: analyzeImport(rows, roles, importRole),
+    players: recalcRows({ rows, roles, importRole: importRole.id, importRoleLocked: importRole.locked }),
+  };
+}
+
+function loadSquadBaseline() {
+  try {
+    const raw = localStorage.getItem(SQUAD_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed?.rows) ? buildSquadBaseline(parsed.rows, parsed) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveSquadBaseline() {
+  try {
+    if (!state.squadBaseline) {
+      localStorage.removeItem(SQUAD_STORAGE_KEY);
+      return;
+    }
+    const { name, savedAt, rows } = state.squadBaseline;
+    localStorage.setItem(SQUAD_STORAGE_KEY, JSON.stringify({ name, savedAt, rows }));
+  } catch {
+    // Squad baseline is local convenience data; scoring still works without browser storage.
+  }
+}
+
+function setSquadRows(rows, name = "Current squad") {
+  state.squadBaseline = buildSquadBaseline(rows, { name });
+  saveSquadBaseline();
+  state.activeTab = "Squad Planner";
+  render();
 }
 
 function databaseViewSnapshot(name) {
@@ -348,18 +393,40 @@ function applyDatabaseView(view) {
   render();
 }
 
+function squadPlayersForRole(roleId) {
+  return (state.squadBaseline?.players || [])
+    .filter((item) => item.role === roleId)
+    .sort((a, b) => b.bestScore - a.bestScore);
+}
+
+function upgradeCall(candidate, incumbent) {
+  if (!candidate) return "No candidates";
+  if (!incumbent) return "Squad gap";
+  const gap = candidate.bestScore - incumbent.bestScore;
+  if (gap >= 5) return "Clear upgrade";
+  if (gap >= 1) return "Possible upgrade";
+  if (gap >= -2) return "Comparable depth";
+  return "Depth only";
+}
+
 function squadPlannerRows() {
   return roles.map((role) => {
     const players = filteredPlayers().filter((item) => item.role === role.id);
     const ranked = [...players].sort((a, b) => b.bestScore - a.bestScore);
     const top = ranked[0];
+    const squad = squadPlayersForRole(role.id);
+    const incumbent = squad[0];
     const saved = players.filter((item) => scoutRecord(item.id).status === "Saved").length;
     const scout = players.filter((item) => scoutRecord(item.id).status === "Scout").length;
     const watch = players.filter((item) => scoutRecord(item.id).status === "Watch").length;
     const greatValue = players.filter((item) => item.dealFlag === "Great value" || item.dealFlag === "FREE - bargain").length;
-    const action = saved ? "Shortlist ready" : scout ? "Review reports" : greatValue ? "Scout value" : players.length < 5 ? "Thin pool" : "Build watchlist";
+    const scoreGap = top && incumbent ? top.bestScore - incumbent.bestScore : null;
+    const action = upgradeCall(top, incumbent);
     return {
       role: role.id,
+      squadCount: squad.length,
+      squadBest: incumbent?.player || "",
+      squadBestScore: incumbent?.bestScore ?? null,
       candidates: players.length,
       savedCount: saved,
       scoutCount: scout,
@@ -368,10 +435,31 @@ function squadPlannerRows() {
       topCandidate: top?.player || "",
       bestRole: top?.bestRole || "",
       bestScore: top?.bestScore ?? null,
+      scoreGap,
       avgScore: mean(players.map((item) => item.bestScore)),
       action,
     };
   });
+}
+
+function squadUpgradeRows() {
+  return roles.map((role) => {
+    const candidates = filteredPlayers().filter((item) => item.role === role.id).sort((a, b) => b.bestScore - a.bestScore);
+    const candidate = candidates[0];
+    const incumbent = squadPlayersForRole(role.id)[0];
+    return {
+      role: role.id,
+      squadPlayer: incumbent?.player || "",
+      squadScore: incumbent?.bestScore ?? null,
+      candidate: candidate?.player || "",
+      candidateScore: candidate?.bestScore ?? null,
+      scoreGap: candidate && incumbent ? candidate.bestScore - incumbent.bestScore : null,
+      candidateDivision: candidate?.division || "",
+      candidateValue: candidate?.actualValue ?? null,
+      dealFlag: candidate?.dealFlag || "",
+      upgradeCall: upgradeCall(candidate, incumbent),
+    };
+  }).sort((a, b) => (b.scoreGap ?? -999) - (a.scoreGap ?? -999));
 }
 function filterComparableValue(row, col) {
   const value = row[col];
@@ -531,8 +619,8 @@ function sampleCsv() {
       Division: "English Premier Division",
       Mins: 2100,
       Age: 22,
-      "Actual Value (�)": 2500000,
-      "Actual Wage (�/wk)": 18000,
+      "Actual Value (\u00a3)": 2500000,
+      "Actual Wage (\u00a3/wk)": 18000,
       "Goals Per 90": 0.52,
       "Non Penalty xGoals Per 90": 0.34,
       "xGoals Per Shot": 0.13,
@@ -556,8 +644,8 @@ function sampleCsv() {
       Division: "Italian Serie A",
       Mins: 2800,
       Age: 24,
-      "Actual Value (�)": 4200000,
-      "Actual Wage (�/wk)": 24000,
+      "Actual Value (\u00a3)": 4200000,
+      "Actual Wage (\u00a3/wk)": 24000,
       "Average Rating": 7.02,
       "Headers Won %": 0.71,
       "Headers Won Per 90": 5.4,
@@ -967,20 +1055,63 @@ function bindDatabaseControls(rows, columns) {
 }
 function renderSquadPlanner() {
   const rows = squadPlannerRows();
-  const ready = rows.filter((row) => row.savedCount > 0).length;
-  const thin = rows.filter((row) => row.action === "Thin pool").length;
-  const scoutNext = rows.reduce((sum, row) => sum + row.scoutCount, 0);
+  const upgrades = squadUpgradeRows();
+  const squad = state.squadBaseline;
+  const clearUpgrades = upgrades.filter((row) => row.upgradeCall === "Clear upgrade" || row.upgradeCall === "Possible upgrade").length;
+  const squadRoles = new Set((squad?.players || []).map((item) => item.role)).size;
+  const savedDate = squad?.savedAt ? new Date(squad.savedAt).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }) : "Not saved";
   renderShell(`
-    ${stats()}
+    <section class="squad-baseline-grid">
+      <section class="panel squad-upload-panel">
+        <div class="panel-head compact"><div><span>Current squad baseline</span><h2>Saved Squad</h2></div></div>
+        <div class="squad-summary">
+          <article><span>Rows</span><strong>${squad?.rows.length || 0}</strong></article>
+          <article><span>Role entries</span><strong>${squad?.players.length || 0}</strong></article>
+          <article><span>Roles covered</span><strong>${squadRoles}</strong></article>
+          <article><span>Saved</span><strong>${escapeHtml(savedDate)}</strong></article>
+        </div>
+        <div class="toolbar squad-upload-actions">
+          <input class="sr-only" id="squadFileInput" type="file" accept=".csv,text/csv" />
+          <label class="file-picker" for="squadFileInput">Upload squad CSV</label>
+          ${squad ? `<button class="ghost" id="clearSquadBaseline" type="button">Clear squad</button>` : ""}
+        </div>
+        <p class="lede">Your saved squad stays in this browser and is used as the comparison baseline for upgrade calls.</p>
+      </section>
+      <section class="panel squad-upgrade-panel">
+        <div class="panel-head compact">
+          <div><span>Upgrade radar</span><h2>Best Candidate vs Squad</h2></div>
+          <strong>${clearUpgrades} upgrade flags</strong>
+        </div>
+        ${squad ? table(upgrades, ["role", "squadPlayer", "squadScore", "candidate", "candidateScore", "scoreGap", "candidateDivision", "candidateValue", "dealFlag", "upgradeCall"], "upgrade-table") : `<div class="empty">Upload your squad CSV to unlock upgrade comparisons.</div>`}
+      </section>
+    </section>
     <section class="panel squad-planner-panel">
       <div class="panel-head">
         <div><span>Role coverage</span><h2>Squad Planner</h2></div>
-        <strong>${ready} roles with saved players / ${scoutNext} scout-next marks / ${thin} thin pools</strong>
+        <strong>${state.players.length} recruitment entries / ${squad?.players.length || 0} squad entries</strong>
       </div>
-      ${table(rows, ["role", "candidates", "savedCount", "scoutCount", "watchCount", "greatValueCount", "topCandidate", "bestRole", "bestScore", "avgScore", "action"], "planner-table")}
+      ${table(rows, ["role", "squadCount", "squadBest", "squadBestScore", "candidates", "savedCount", "scoutCount", "watchCount", "greatValueCount", "topCandidate", "bestRole", "bestScore", "scoreGap", "avgScore", "action"], "planner-table")}
     </section>
   `);
   bindTable();
+  bindSquadPlannerControls();
+}
+
+function bindSquadPlannerControls() {
+  app.querySelector("#squadFileInput")?.addEventListener("change", (event) => importSquadFile(event.target.files[0]));
+  app.querySelector("#clearSquadBaseline")?.addEventListener("click", () => {
+    if (!confirm("Clear the saved squad baseline from this browser?")) return;
+    state.squadBaseline = null;
+    saveSquadBaseline();
+    render();
+  });
+}
+
+function importSquadFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => setSquadRows(parseCsv(String(reader.result)), file.name.replace(/\.csv$/i, ""));
+  reader.readAsText(file);
 }
 function renderRoleSheets() {
   const sections = rolesWithRows().map((role) => {
