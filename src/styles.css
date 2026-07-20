@@ -1526,9 +1526,13 @@ tbody tr:hover {
 
 .squad-baseline-grid {
   display: grid;
-  grid-template-columns: minmax(340px, .42fr) minmax(620px, 1fr);
+  grid-template-columns: minmax(340px, 360px) 1fr;
   gap: 12px;
   align-items: start;
+}
+
+.squad-upgrade-panel {
+  grid-column: 1 / -1;
 }
 
 .squad-summary {
@@ -1589,6 +1593,14 @@ tbody tr:hover {
 .upgrade-table td:nth-child(4),
 .upgrade-table td:nth-child(10) {
   font-weight: 850;
+}
+.upgrade-table tbody tr.upgrade-row {
+  background: linear-gradient(90deg, rgba(98, 214, 173, .18), rgba(209, 245, 118, .08));
+  box-shadow: inset 4px 0 0 var(--accent);
+}
+
+.upgrade-table tbody tr.upgrade-row:hover {
+  background: linear-gradient(90deg, rgba(98, 214, 173, .24), rgba(209, 245, 118, .12));
 }
 
 .planner-table {

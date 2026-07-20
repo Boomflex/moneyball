@@ -121,8 +121,13 @@ export function table(rows, columns, className = "", options = {}) {
   if (!rows.length) return `<div class="empty">No rows yet.</div>`;
   return `<div class="table-wrap"><table class="${className}">
     <thead><tr>${columns.map((col) => headerCell(col, options)).join("")}</tr></thead>
-    <tbody>${rows.map((row) => `<tr>${columns.map((col) => `<td>${formatCell(row, col)}</td>`).join("")}</tr>`).join("")}</tbody>
+    <tbody>${rows.map((row) => `<tr${rowClassAttr(row, options)}>${columns.map((col) => `<td>${formatCell(row, col)}</td>`).join("")}</tr>`).join("")}</tbody>
   </table></div>`;
+}
+
+function rowClassAttr(row, options) {
+  const value = typeof options.rowClass === "function" ? options.rowClass(row) : "";
+  return value ? ` class="${escapeHtml(value)}"` : "";
 }
 
 function headerCell(col, options) {

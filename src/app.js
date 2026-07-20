@@ -1082,7 +1082,7 @@ function renderSquadPlanner() {
           <div><span>Upgrade radar</span><h2>Best Candidate vs Squad</h2></div>
           <strong>${clearUpgrades} upgrade flags</strong>
         </div>
-        ${squad ? table(upgrades, ["role", "squadPlayer", "squadScore", "candidate", "candidateScore", "scoreGap", "candidateDivision", "candidateValue", "dealFlag", "upgradeCall"], "upgrade-table") : `<div class="empty">Upload your squad CSV to unlock upgrade comparisons.</div>`}
+        ${squad ? table(upgrades, ["role", "squadPlayer", "squadScore", "candidate", "candidateScore", "scoreGap", "candidateDivision", "candidateValue", "dealFlag", "upgradeCall"], "upgrade-table", { rowClass: (row) => ["Clear upgrade", "Possible upgrade"].includes(row.upgradeCall) ? "upgrade-row" : "" }) : `<div class="empty">Upload your squad CSV to unlock upgrade comparisons.</div>`}
       </section>
     </section>
     <section class="panel squad-planner-panel">
