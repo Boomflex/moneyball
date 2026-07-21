@@ -1229,6 +1229,13 @@ function bindTable() {
     render();
   }));
 
+  app.querySelectorAll(".table-wrap tbody tr").forEach((row) => row.addEventListener("click", (event) => {
+    if (event.target.closest("button, input, select, textarea, a, label")) return;
+    const table = row.closest("table");
+    table?.querySelectorAll("tbody tr.selected-row").forEach((selected) => selected.classList.remove("selected-row"));
+    row.classList.add("selected-row");
+  }));
+
   app.querySelectorAll("[data-filter-popover]").forEach((popover) => popover.addEventListener("click", (event) => event.stopPropagation()));
   app.querySelectorAll("[data-filter-apply]").forEach((button) => button.addEventListener("click", () => {
     const key = button.dataset.filterApply;
