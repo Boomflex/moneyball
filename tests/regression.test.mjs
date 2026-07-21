@@ -28,6 +28,10 @@ const EXPORTS = {
     path: "C:/Users/jakek/OneDrive/Documents/Sports Interactive/Football Manager 26/FM26PlayerExport by vinteset/Exports CSV/moneyball_export_20260720_095224.csv",
     expected: { rowCount: 160, importRole: null, locked: false, coverage: 100, entries: 182, positionMatched: true, roleCounts: { MID: 64, Winger: 39, CB: 36, FB: 23, Striker: 20 } },
   },
+  CorrectedRioTinto: {
+    path: "C:/Users/jakek/OneDrive/Documents/Sports Interactive/Football Manager 26/FM26PlayerExport by vinteset/Exports CSV/moneyball_export_20260721_212326.csv",
+    expected: { rowCount: 31, importRole: "CB", coverage: 93.3, entries: 31, positionMatched: true, top: { player: "Denis Moukoko", role: "CB", bestRole: "Stopper", bestScore: 27.3, totalVfm: 2.1, valueRatio: null, dealFlag: "No league data" }, players: { "Abulai Mendy": { division: "No league data", bestScore: 22.2, dealFlag: "FREE - bargain" } }, noteIncludes: "Rio Tinto division corrected to No league data" },
+  },
   CM: {
     path: "C:/Users/jakek/OneDrive/Documents/Sports Interactive/Football Manager 26/FM26PlayerExport by vinteset/Exports CSV/moneyball_export_20260718_152255.csv",
     expected: { rowCount: 213, importRole: "MID", entries: 213, top: { player: "Rob Leather", role: "MID", bestRole: "CAM", bestScore: 44.1, totalVfm: 3.5, valueRatio: 2.3, dealFlag: "Great value" } },
@@ -80,6 +84,19 @@ for (const [name, fixture] of Object.entries(EXPORTS)) {
     assert.equal(round1(top.totalVfm), fixture.expected.top.totalVfm, `${name} top total VFM changed`);
     assert.equal(round1(top.valueRatio), fixture.expected.top.valueRatio, `${name} top value ratio changed`);
     assert.equal(top.dealFlag, fixture.expected.top.dealFlag, `${name} top deal flag changed`);
+  }
+  if (fixture.expected.players) {
+    for (const [playerName, expectedPlayer] of Object.entries(fixture.expected.players)) {
+      const player = players.find((item) => item.player === playerName);
+      assert.ok(player, `${name} should include ${playerName}`);
+      if ("division" in expectedPlayer) assert.equal(player.division, expectedPlayer.division, `${name} ${playerName} division changed`);
+      if ("bestScore" in expectedPlayer) assert.equal(round1(player.bestScore), expectedPlayer.bestScore, `${name} ${playerName} score changed`);
+      if ("dealFlag" in expectedPlayer) assert.equal(player.dealFlag, expectedPlayer.dealFlag, `${name} ${playerName} deal flag changed`);
+    }
+  }
+
+  if (fixture.expected.noteIncludes) {
+    assert.ok(report.derivedFields.some((field) => field.includes(fixture.expected.noteIncludes)), `${name} should report source correction`);
   }
 
   if (name === "GK") {

@@ -1,5 +1,9 @@
 import { mean, normalise, roleIdsFromPositionText } from "./utils.js";
 
+const CLUB_DIVISION_OVERRIDES = new Map([
+  ["riotinto", { division: "No league data", note: "Rio Tinto division corrected to No league data from exported league value" }],
+]);
+
 export const HEADER_ALIASES = new Map(Object.entries({
   "mins": ["Minutes"],
   "playername": ["Player", "Name"],
@@ -123,7 +127,19 @@ export function parseCsv(text) {
   const headers = rows.shift().map((header) => header.trim());
   const parsed = rows.map((values) => Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ""])));
   normaliseImportedScales(parsed);
+  applyClubDivisionOverrides(parsed);
   return parsed;
+}
+
+function applyClubDivisionOverrides(rows) {
+  for (const row of rows) {
+    const clubKey = normalise(row.Club || "");
+    const override = CLUB_DIVISION_OVERRIDES.get(clubKey);
+    if (!override || row.Division === override.division) continue;
+    const originalDivision = String(row.Division || "").trim();
+    row.Division = override.division;
+    addNormalizationNote(row, originalDivision ? `${override.note} (${originalDivision})` : override.note);
+  }
 }
 
 function normaliseImportedScales(rows) {
