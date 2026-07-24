@@ -531,14 +531,13 @@ textarea {
 
 .import-grid {
   display: grid;
-  grid-template-columns: minmax(320px, .75fr) minmax(420px, 1.25fr);
+  grid-template-columns: minmax(360px, .85fr) minmax(420px, 1.15fr);
   gap: 14px;
   align-items: stretch;
 }
 
 .panel,
 .dropzone,
-.paste-panel,
 .schema-panel,
 .guide-card,
 .stats article,
@@ -551,7 +550,6 @@ textarea {
 }
 
 .panel,
-.paste-panel,
 .schema-panel,
 .guide-card {
   padding: 16px;
@@ -1085,7 +1083,6 @@ tbody tr.selected-row:hover {
 .panel,
 .selectors,
 .dropzone,
-.paste-panel,
 .schema-panel,
 .guide-card,
 .stats article,

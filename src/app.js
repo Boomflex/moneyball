@@ -1,6 +1,6 @@
 import { WORKBOOK_MODEL } from "./model.js";
 import { applyLeagueOverrides } from "./league-overrides.js";
-import { analyzeImport, inferImportRole, parseCsv, rowGetter, templateHeaders } from "./importer.js";
+import { analyzeImport, inferImportRole, parseCsv, rowGetter } from "./importer.js";
 import {
   allRoleStatColumns,
   percentileForStat,
@@ -652,64 +652,6 @@ function csvValue(row, col) {
 function toCsvColumns(rows, columns) {
   return [columns.map((col) => csvCell(labelFor(col))).join(","), ...rows.map((row) => columns.map((col) => csvCell(csvValue(row, col))).join(","))].join("\n");
 }
-function sampleCsv() {
-  const headers = templateHeaders(roles);
-  const rows = [
-    {
-      "Player Name": "Rafael Ortiz",
-      "Best Position": "ST",
-      "Other Positions": "AMR",
-      Division: "English Premier Division",
-      Mins: 2100,
-      Age: 22,
-      "Actual Value (\u00a3)": 2500000,
-      "Actual Wage (\u00a3/wk)": 18000,
-      "Goals Per 90": 0.52,
-      "Non Penalty xGoals Per 90": 0.34,
-      "xGoals Per Shot": 0.13,
-      "Conversion %": 0.19,
-      "Shots On Target %": 0.52,
-      "Shots Per 90": 3.1,
-      "xG_Overperformance_Per_90": 0.16,
-      "Assists Per 90": 0.11,
-      "xAssists Per 90": 0.14,
-      "Chances Created Per 90": 0.28,
-      "Key Passes Per 90": 0.86,
-      "Headers Won %": 0.3,
-      "Headers Won Per 90": 2.7,
-      "Possession Won Per 90": 2.6,
-      "Pressures Completed Per 90": 1.9,
-      "Pass Completion %": 0.81,
-    },
-    {
-      "Player Name": "Luca Marin",
-      "Best Position": "CB",
-      Division: "Italian Serie A",
-      Mins: 2800,
-      Age: 24,
-      "Actual Value (\u00a3)": 4200000,
-      "Actual Wage (\u00a3/wk)": 24000,
-      "Average Rating": 7.02,
-      "Headers Won %": 0.71,
-      "Headers Won Per 90": 5.4,
-      "Tackle Completion %": 0.86,
-      "Tackles Completed Per 90": 1.7,
-      "Interceptions Per 90": 1.8,
-      "Blocks Per 90": 0.58,
-      "Clearences Per 90": 1.7,
-      "Mistakes Leading To Goal Per 90": 0,
-      "Pass Completion %": 0.88,
-      "Progressive Passes Per 90": 4.3,
-      "Possession Won Per 90": 15.2,
-      "Possession Lost Per 90": 3.1,
-      "Pressures Completed Per 90": 1.4,
-      "Passes Completed Per 90": 51.2,
-      "Fouls Per 90": 0.55,
-    },
-  ];
-  return [headers.join(","), ...rows.map((row) => headers.map((header) => csvCell(row[header] ?? "")).join(","))].join("\n");
-}
-
 function download(filename, text) {
   const blob = new Blob([text], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -881,14 +823,6 @@ function renderImport() {
         <label class="file-picker" for="fileInput">Browse export</label>
         <small id="fileStatus">No file selected</small>
       </section>
-      <section class="paste-panel command-panel">
-        <div class="panel-head compact"><div><span>Manual intake</span><h2>Paste CSV</h2></div></div>
-        <textarea id="pasteCsv" spellcheck="false" placeholder="Player Name,Best Position,Division,Mins,Age,..."></textarea>
-        <div class="toolbar">
-          <button class="primary" id="parsePaste">Run import</button>
-          <button class="ghost" id="downloadSample">Sample CSV</button>
-        </div>
-      </section>
       <section class="schema-panel">
         <div class="panel-head compact"><div><span>Workbook coverage</span><h2>Input maps</h2></div></div>
         <div class="schema-list">
@@ -913,8 +847,6 @@ function renderImport() {
     updateFileStatus(file);
     importFile(file);
   });
-  app.querySelector("#parsePaste").addEventListener("click", () => setRows(parseCsv(app.querySelector("#pasteCsv").value)));
-  app.querySelector("#downloadSample").addEventListener("click", () => download("sample-moneyball-import.csv", sampleCsv()));
 }
 
 function updateFileStatus(file) {
