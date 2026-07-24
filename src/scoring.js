@@ -1,4 +1,5 @@
 import { rowGetter, safeNumber } from "./importer.js";
+import { resolveLeague } from "./league-overrides.js";
 import { clamp, mean, normalise, roleIdsFromPositionText, stdev } from "./utils.js";
 
 export const roleById = (roles, id) => roles.find((role) => role.id === id);
@@ -9,6 +10,17 @@ const CONTROL_WEIGHTS = {
   pressure: 2.23,
   possession: 7.66,
 };
+
+function stableIdPart(value) {
+  const text = String(value ?? "").trim();
+  return normalise(text) || "unknown";
+}
+
+function makePlayerId({ playerName, roleId, club, division, age, rowIndex }) {
+  return [playerName || "Unnamed player", roleId, club || "No club", division || "No division", age ?? "No age", rowIndex]
+    .map(stableIdPart)
+    .join("__");
+}
 
 export function hasRoleHint(row, role) {
   const get = rowGetter(row);
@@ -86,8 +98,8 @@ export function controlProfileForRow(row, role) {
   const pressureIndex = pressuresWon !== null && pressureRatio !== null ? pressuresWon * pressureRatio : null;
   const possessionIndex = possessionWon;
   const possessionLossRate = positiveRatio(possessionLost, passesAttempted);
-  const leagueName = String(get("Division") || "").trim();
-  const leagueStrength = Number(role.leagues[leagueName]?.strength) || 35;
+  const resolvedLeague = resolveLeague(role, get("Division"));
+  const leagueStrength = Number(resolvedLeague.data?.strength) || 35;
   const leagueAdjustment = leagueStrength / 55;
 
   const components = [
@@ -115,7 +127,7 @@ export function controlProfileForRow(row, role) {
   };
 }
 
-export function scoreRole(row, role) {
+export function scoreRole(row, role, rowIndex = 0) {
   const get = rowGetter(row);
   const scores = role.scoreColumns.map((score) => {
     let sum = 0;
@@ -129,9 +141,8 @@ export function scoreRole(row, role) {
         sum += stat.weight * stat.direction * ((value - stat.mean) / stat.stdev);
       }
     }
-    const leagueName = String(get("Division") || "").trim();
-    const league = role.leagues[leagueName];
-    const leagueStrength = Number(league?.strength) || 35;
+    const resolvedLeague = resolveLeague(role, get("Division"));
+    const leagueStrength = Number(resolvedLeague.data?.strength) || 35;
     const adjusted = ((sum / score.denominator) + 3) * (leagueStrength / 55) * 10;
     return {
       label: score.label,
@@ -146,7 +157,8 @@ export function scoreRole(row, role) {
   const age = safeNumber(get("Age"));
   const actualValue = safeNumber(get("Actual Value")) ?? safeNumber(get("Value"));
   const actualWage = safeNumber(get("Actual Wage")) ?? safeNumber(get("Wage"));
-  const league = role.leagues[String(get("Division") || "").trim()];
+  const resolvedLeague = resolveLeague(role, get("Division"));
+  const league = resolvedLeague.data;
   const expectedValue = league && age !== null && [league.valueScoreCoef, league.valueAgeCoef, league.valueIntercept].every(Number.isFinite)
     ? Math.exp(league.valueScoreCoef * best.score + league.valueAgeCoef * age + league.valueIntercept)
     : null;
@@ -154,12 +166,18 @@ export function scoreRole(row, role) {
     ? Math.exp(league.wageScoreCoef * best.score + league.wageAgeCoef * age + league.wageIntercept)
     : null;
 
+  const rawDivision = get("Division") || "Unknown";
+  const club = get("Club") || get("Team") || "";
+  const legacyId = `${playerName}-${role.id}`;
   const archetype = inferArchetype(role.id, best.label, row);
   return {
-    id: `${playerName}-${role.id}`,
+    id: makePlayerId({ playerName, roleId: role.id, club, division: rawDivision, age, rowIndex }),
+    legacyId,
     player: playerName || "Unnamed player",
+    club,
     role: role.id,
-    division: get("Division") || "Unknown",
+    division: resolvedLeague.matched ? resolvedLeague.name : rawDivision,
+    sourceDivision: rawDivision,
     age,
     minutes: safeNumber(get("Mins")),
     scores,
@@ -201,12 +219,12 @@ export function inferArchetype(role, bestRole, row) {
 export function recalcRows({ rows, roles, importRole, importRoleLocked }) {
   const entries = [];
   const selectedRole = importRole ? roleById(roles, importRole) : null;
-  for (const row of rows) {
+  for (const [rowIndex, row] of rows.entries()) {
     const hintedRoles = roles.filter((role) => hasRoleHint(row, role));
     const inferredRole = selectedRole ? [selectedRole] : roles;
     const candidateRoles = importRoleLocked ? inferredRole : (hintedRoles.length ? hintedRoles : inferredRole);
     const scoredRoles = candidateRoles
-      .map((role) => ({ role, calculated: scoreRole(row, role) }))
+      .map((role) => ({ role, calculated: scoreRole(row, role, rowIndex) }))
       .filter((item) => item.calculated);
 
     if (hintedRoles.length) {
@@ -255,21 +273,6 @@ export function scoreProfileForPlayer(player, role) {
   return role.scoreColumns.find((score) => score.label.toLowerCase().includes(cleanBestRole)) || role.scoreColumns[0];
 }
 
-export function keyStatsForPlayer(player, role, limit = 6) {
-  const profile = scoreProfileForPlayer(player, role);
-  if (!profile) return [];
-  const get = rowGetter(player.source);
-  return [...profile.stats]
-    .sort((a, b) => b.weight - a.weight)
-    .map((stat) => ({
-      label: stat.header,
-      value: valueForStat(get, stat),
-      weight: stat.weight,
-      direction: stat.direction,
-    }))
-    .filter((stat) => stat.value !== null)
-    .slice(0, limit);
-}
 
 export function roleStatColumns(role, rows, limit = 6) {
   const displayLimit = role.id === "CB" ? Math.max(limit, 8) : limit;

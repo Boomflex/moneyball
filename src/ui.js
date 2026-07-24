@@ -198,7 +198,7 @@ export function importReportCard(report) {
 }
 
 export function playerSelectors(players, a, b) {
-  const options = players.slice(0, 300).map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.player)} - ${item.role}</option>`).join("");
+  const options = players.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.player)} - ${item.role}</option>`).join("");
   return `<section class="selectors">
     <label>Player A<select id="selectedA"><option></option>${options}</select></label>
     <label>Player B<select id="selectedB"><option></option>${options}</select></label>

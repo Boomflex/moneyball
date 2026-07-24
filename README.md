@@ -1,6 +1,6 @@
 # Moneyball Recruitment Browser App
 
-A static browser version of the recruitment workbook. It keeps the workbook flow as app tabs: CSV import, Best Buy, Squad Need, Role Sheets, Pizza Charts, Player Similarity, League Standards, and Archetype Guide.
+A static browser version of the recruitment workbook. It keeps the workbook maths locked while adding CSV import, a player database, role sheets, player comparison, squad planning, and model reference views.
 
 ## Run locally
 

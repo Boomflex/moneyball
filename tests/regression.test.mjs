@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { WORKBOOK_MODEL } from "../src/model.js";
-import { applyLeagueOverrides } from "../src/league-overrides.js";
+import { applyLeagueOverrides, resolveLeague } from "../src/league-overrides.js";
 import { analyzeImport, inferImportRole, parseCsv } from "../src/importer.js";
 import { controlProfileForRow, recalcRows } from "../src/scoring.js";
 
@@ -108,6 +108,14 @@ for (const [name, fixture] of Object.entries(EXPORTS)) {
   }
 }
 
+
+const sampleRows = parseCsv(fs.readFileSync(new URL("../sample-moneyball-import.csv", import.meta.url), "utf8"));
+const sampleImportRole = inferImportRole(sampleRows, MODEL.roles);
+const samplePlayers = recalcRows({ rows: sampleRows, roles: MODEL.roles, importRole: sampleImportRole.id, importRoleLocked: sampleImportRole.locked });
+assert.equal(sampleRows.length, 2, "sample CSV row count changed");
+assert.ok(samplePlayers.length > 0, "sample CSV should produce scored role entries");
+assert.equal(new Set(samplePlayers.map((player) => player.id)).size, samplePlayers.length, "scored players should have unique stable IDs");
+assert.ok(samplePlayers.every((player) => player.legacyId && player.id !== player.legacyId), "scored players should retain legacy IDs for saved scout records");
 for (const role of MODEL.roles) {
   const nationalLeague = role.leagues["Vanarama National League"];
   const nifl = role.leagues["NIFL Premiership"];
@@ -115,6 +123,7 @@ for (const role of MODEL.roles) {
   assert.equal(Number(nifl.strength.toFixed(1)), Number((nationalLeague.strength - 0.1).toFixed(1)), `${role.id} NIFL strength should sit one tick below Vanarama National League`);
   assert.equal(nifl.valueScoreCoef, nationalLeague.valueScoreCoef, `${role.id} NIFL value score coefficient should mirror Vanarama National League`);
   assert.equal(nifl.wageScoreCoef, nationalLeague.wageScoreCoef, `${role.id} NIFL wage score coefficient should mirror Vanarama National League`);
+  assert.equal(resolveLeague(role, "Northern Ireland Premiership").name, "NIFL Premiership", `${role.id} Northern Ireland Premiership alias should resolve to NIFL Premiership`);
 }
 
 const controlRole = MODEL.roles.find((role) => role.id === "Winger");

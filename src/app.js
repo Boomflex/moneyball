@@ -13,13 +13,14 @@ import {
   statColumnKey,
 } from "./scoring.js";
 import { csvCell, escapeHtml, mean } from "./utils.js";
-import { fmt, formatStatValue, importReportCard, labelFor, metricCompare, playerSelectors, radar, statCards as renderStatCards, table } from "./ui.js";
+import { fmt, formatStatValue, importReportCard, labelFor, metricCompare, playerSelectors, radar, table } from "./ui.js";
 
 const SCOUT_STORAGE_KEY = "moneyball.scoutRecords.v1";
 const DATABASE_VIEWS_STORAGE_KEY = "moneyball.databaseViews.v1";
 const SQUAD_STORAGE_KEY = "moneyball.squadBaseline.v1";
 const DATABASE_STATUSES = ["New", "Watch", "Scout", "Saved", "Ignore"];
 const DATABASE_PRIORITIES = ["", "A", "B", "C"];
+let initialStorageWarning = "";
 
 const model = applyLeagueOverrides(WORKBOOK_MODEL);
 const roles = model.roles;
@@ -60,6 +61,7 @@ const state = {
   databaseViewName: "",
   databaseSavedView: "",
   leaderStat: "",
+  storageWarning: initialStorageWarning,
 };
 
 const tabs = [
@@ -127,6 +129,7 @@ function loadScoutRecords() {
     const raw = localStorage.getItem(SCOUT_STORAGE_KEY);
     return raw ? JSON.parse(raw) : {};
   } catch {
+    initialStorageWarning = "Saved scouting notes could not be loaded from browser storage.";
     return {};
   }
 }
@@ -134,8 +137,9 @@ function loadScoutRecords() {
 function saveScoutRecords() {
   try {
     localStorage.setItem(SCOUT_STORAGE_KEY, JSON.stringify(state.scoutRecords));
+    state.storageWarning = "";
   } catch {
-    // Scouting annotations are nice-to-have; the workbook model still runs without browser storage.
+    state.storageWarning = "Scouting notes could not be saved. Browser storage may be blocked or full.";
   }
 }
 
@@ -145,6 +149,7 @@ function loadDatabaseViews() {
     const parsed = raw ? JSON.parse(raw) : [];
     return Array.isArray(parsed) ? parsed.filter((view) => view?.name) : [];
   } catch {
+    initialStorageWarning = "Saved database views could not be loaded from browser storage.";
     return [];
   }
 }
@@ -152,8 +157,9 @@ function loadDatabaseViews() {
 function saveDatabaseViews() {
   try {
     localStorage.setItem(DATABASE_VIEWS_STORAGE_KEY, JSON.stringify(state.databaseViews));
+    state.storageWarning = "";
   } catch {
-    // Saved views are a browser convenience and do not affect workbook scoring.
+    state.storageWarning = "Database views could not be saved. Browser storage may be blocked or full.";
   }
 }
 function buildSquadBaseline(rows, metadata = {}) {
@@ -176,6 +182,7 @@ function loadSquadBaseline() {
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed?.rows) ? buildSquadBaseline(parsed.rows, parsed) : null;
   } catch {
+    initialStorageWarning = "Saved squad baseline could not be loaded from browser storage.";
     return null;
   }
 }
@@ -184,12 +191,14 @@ function saveSquadBaseline() {
   try {
     if (!state.squadBaseline) {
       localStorage.removeItem(SQUAD_STORAGE_KEY);
+      state.storageWarning = "";
       return;
     }
     const { name, savedAt, rows } = state.squadBaseline;
     localStorage.setItem(SQUAD_STORAGE_KEY, JSON.stringify({ name, savedAt, rows }));
+    state.storageWarning = "";
   } catch {
-    // Squad baseline is local convenience data; scoring still works without browser storage.
+    state.storageWarning = "Squad baseline could not be saved. Browser storage may be blocked or full.";
   }
 }
 
@@ -263,8 +272,10 @@ function deleteSavedDatabaseView() {
   saveDatabaseViews();
   render();
 }
-function scoutRecord(id) {
-  const record = state.scoutRecords[id] || {};
+function scoutRecord(playerOrId) {
+  const id = typeof playerOrId === "string" ? playerOrId : playerOrId?.id;
+  const legacyId = typeof playerOrId === "string" ? null : playerOrId?.legacyId;
+  const record = state.scoutRecords[id] || (legacyId ? state.scoutRecords[legacyId] : null) || {};
   return {
     status: DATABASE_STATUSES.includes(record.status) ? record.status : "New",
     priority: DATABASE_PRIORITIES.includes(record.priority) ? record.priority : "",
@@ -280,7 +291,7 @@ function updateScoutRecord(id, patch) {
 
 function databaseStatusCounts(players) {
   const counts = Object.fromEntries(DATABASE_STATUSES.map((status) => [status, 0]));
-  for (const player of players) counts[scoutRecord(player.id).status] += 1;
+  for (const player of players) counts[scoutRecord(player).status] += 1;
   return counts;
 }
 
@@ -289,7 +300,7 @@ function databaseDealOptions(players) {
 }
 
 function databasePassesScoutFilters(player) {
-  const record = scoutRecord(player.id);
+  const record = scoutRecord(player);
   const statusMatch = state.databaseStatus === "All"
     || (state.databaseStatus === "Active" ? record.status !== "Ignore" : record.status === state.databaseStatus);
   const priorityMatch = state.databasePriority === "All"
@@ -300,7 +311,7 @@ function databasePassesScoutFilters(player) {
 
 function databaseRows(players, statColumns) {
   return roleSheetRows(players, statColumns).map((row) => {
-    const record = scoutRecord(row.id);
+    const record = scoutRecord(row);
     return {
       ...row,
       modelRank: row.rank,
@@ -333,17 +344,6 @@ function databaseToolDrawer(statOptions, leaderRows, selectedStat) {
     <summary><span>Views and stat leaders</span><strong>${state.databaseViews.length} saved views / ${leaderRows.length} leaders</strong></summary>
     ${databaseUtilityPanels(statOptions, leaderRows, selectedStat)}
   </details>`;
-}
-function databaseBoard(players) {
-  const counts = databaseStatusCounts(players);
-  const active = players.length - counts.Ignore;
-  return `<section class="database-board" aria-label="Scouting workflow counts">
-    <article><span>Active pool</span><strong>${active}</strong><small>Not ignored</small></article>
-    <article><span>Saved</span><strong>${counts.Saved}</strong><small>Shortlist locks</small></article>
-    <article><span>Scout next</span><strong>${counts.Scout}</strong><small>Needs report</small></article>
-    <article><span>Watch</span><strong>${counts.Watch}</strong><small>Monitor only</small></article>
-    <article><span>Ignored</span><strong>${counts.Ignore}</strong><small>Hidden by default</small></article>
-  </section>`;
 }
 function databaseViewButtons() {
   const isActive = (view) => {
@@ -416,9 +416,9 @@ function squadPlannerRows() {
     const top = ranked[0];
     const squad = squadPlayersForRole(role.id);
     const incumbent = squad[0];
-    const saved = players.filter((item) => scoutRecord(item.id).status === "Saved").length;
-    const scout = players.filter((item) => scoutRecord(item.id).status === "Scout").length;
-    const watch = players.filter((item) => scoutRecord(item.id).status === "Watch").length;
+    const saved = players.filter((item) => scoutRecord(item).status === "Saved").length;
+    const scout = players.filter((item) => scoutRecord(item).status === "Scout").length;
+    const watch = players.filter((item) => scoutRecord(item).status === "Watch").length;
     const greatValue = players.filter((item) => item.dealFlag === "Great value" || item.dealFlag === "FREE - bargain").length;
     const scoreGap = top && incumbent ? top.bestScore - incumbent.bestScore : null;
     const action = upgradeCall(top, incumbent);
@@ -677,6 +677,15 @@ function download(filename, text) {
   URL.revokeObjectURL(url);
 }
 
+function storageNotice() {
+  if (!state.storageWarning) return "";
+  return `<section class="notice storage-notice" role="status">
+    <strong>Save warning</strong>
+    <span>${escapeHtml(state.storageWarning)}</span>
+    <button class="ghost" data-dismiss-storage-warning type="button">Dismiss</button>
+  </section>`;
+}
+
 function renderShell(content, options = {}) {
   const showControls = options.showControls ?? state.activeTab !== "Import";
   const showImportReport = options.showImportReport ?? state.activeTab !== "Import";
@@ -701,6 +710,7 @@ function renderShell(content, options = {}) {
       <aside class="credits-bar">Spreadsheet by <a href="https://x.com/MattFitz94" target="_blank" rel="noopener noreferrer">Matt Fitzgerald</a> and <a href="https://x.com/Thecultof" target="_blank" rel="noopener noreferrer">Jack</a> from <a href="https://www.youtube.com/@TheCultofFM" target="_blank" rel="noopener noreferrer">TheCultofFM</a>; additional ideas from <a href="https://x.com/nstntly" target="_blank" rel="noopener noreferrer">Willum</a></aside>
     </header>
     <main class="workspace${workspaceClass}">
+      ${storageNotice()}
       ${showControls ? controls() : ""}
       ${showImportReport ? importReportCard(state.importReport) : ""}
       ${content}
@@ -709,9 +719,15 @@ function renderShell(content, options = {}) {
   bindGlobal();
 }
 
+function scoreSliderMax() {
+  const topScore = Math.max(100, ...state.players.map((player) => Number(player.bestScore) || 0));
+  return Math.ceil(topScore / 10) * 10;
+}
+
 function controls() {
   const showEmpty = state.activeTab === "Role Sheets";
   const roleSheetFilterCount = activeRoleSheetFilterCount();
+  const scoreMax = scoreSliderMax();
   const roleSheetTools = state.activeTab === "Role Sheets" ? `<div class="segmented role-sheet-mode" aria-label="Role sheet mode">
     <button id="roleSheetSimple" class="${state.roleSheetMode === "simple" ? "active" : ""}" type="button">Simple</button>
     <button id="roleSheetDetailed" class="${state.roleSheetMode === "detailed" ? "active" : ""}" type="button">Detailed</button>
@@ -741,7 +757,7 @@ function controls() {
       </div>
       <div class="range-filter">
         <div class="range-head"><span>Score</span><strong id="scoreLabel">${fmt(state.minScore)}+</strong></div>
-        <input id="scoreMin" type="range" min="0" max="100" step="0.5" value="${state.minScore}" aria-label="Minimum score" />
+        <input id="scoreMin" type="range" min="0" max="${scoreMax}" step="0.5" value="${Math.min(state.minScore, scoreMax)}" aria-label="Minimum score" />
       </div>
       ${showEmpty ? `<label class="check"><input id="showEmptyRoles" type="checkbox" ${state.showEmptyRoles ? "checked" : ""} /> Show empty roles</label>` : ""}
       ${roleSheetTools}
@@ -753,6 +769,7 @@ function bindGlobal() {
   app.querySelectorAll("[data-tab]").forEach((button) => button.addEventListener("click", () => setTab(button.dataset.tab)));
   app.querySelector("[data-action='template']")?.addEventListener("click", () => download("moneyball-import-template.csv", `${templateHeaders(roles).join(",")}\n`));
   app.querySelector("[data-action='sample']")?.addEventListener("click", () => setRows(parseCsv(sampleCsv())));
+  app.querySelector("[data-dismiss-storage-warning]")?.addEventListener("click", () => { state.storageWarning = ""; render(); });
   app.querySelector("#roleFilter")?.addEventListener("change", (event) => { state.roleFilter = event.target.value; render(); });
   app.querySelector("#search")?.addEventListener("input", (event) => {
     const caret = event.target.selectionStart;
@@ -875,9 +892,6 @@ function importFile(file) {
   reader.readAsText(file);
 }
 
-function stats() {
-  return renderStatCards({ rows: state.rows, players: state.players, filteredPlayers: filteredPlayers(), mean });
-}
 
 function rolesWithRows() {
   if (state.roleFilter !== "All") return [roleById(roles, state.roleFilter)].filter(Boolean);
@@ -924,7 +938,7 @@ function renderPlayerDatabase() {
   const selectedChips = selectedStats.map((stat) => `
     <button class="stat-chip" data-db-remove-stat="${escapeHtml(stat.header)}" type="button">${escapeHtml(labelFor(statColumnKey(stat)))} <span>x</span></button>
   `).join("");
-  const noteCount = basePlayers.filter((player) => scoutRecord(player.id).notes).length;
+  const noteCount = basePlayers.filter((player) => scoutRecord(player).notes).length;
 
   renderShell(`
     ${databaseCompactSummary(basePlayers, databasePlayers)}

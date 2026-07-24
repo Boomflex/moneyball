@@ -271,6 +271,33 @@ button.primary,
   color: var(--ink);
   text-decoration: underline;
 }
+
+.notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 189, 90, .45);
+  border-radius: 12px;
+  color: var(--ink);
+  background: rgba(255, 189, 90, .1);
+}
+
+.notice strong {
+  color: var(--amber);
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.notice span {
+  flex: 1;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+}
 .workspace {
   display: grid;
   gap: 16px;
@@ -1338,41 +1365,6 @@ tbody tr.selected-row:hover {
 .leader-table td:nth-child(8) {
   font-weight: 850;
 }
-.database-board {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(130px, 1fr));
-  gap: 10px;
-}
-
-.database-board article {
-  padding: 13px 14px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background:
-    linear-gradient(135deg, rgba(98, 214, 173, .1), transparent 54%),
-    rgba(10, 16, 15, .84);
-  box-shadow: var(--shadow);
-}
-
-.database-board span {
-  color: var(--accent);
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: .12em;
-  text-transform: uppercase;
-}
-
-.database-board strong {
-  display: block;
-  margin-top: 5px;
-  color: var(--ink);
-  font-size: 25px;
-}
-
-.database-board small {
-  color: var(--muted);
-  font-weight: 800;
-}
 .database-views {
   display: flex;
   flex-wrap: wrap;
@@ -1699,7 +1691,6 @@ tbody tr.selected-row:hover {
   }
 
   .stats,
-  .database-board,
   .database-compact-summary,
   .import-report {
     grid-template-columns: repeat(2, minmax(150px, 1fr));
@@ -1744,7 +1735,6 @@ tbody tr.selected-row:hover {
   }
 
   .stats,
-  .database-board,
   .database-compact-summary,
   .import-report,
   .hero-metrics {
