@@ -200,7 +200,16 @@ export function importReportCard(report) {
 }
 
 export function playerSelectors(players, a, b) {
-  const options = players.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.player)} - ${item.role}</option>`).join("");
+  const groups = players.reduce((map, item) => {
+    const source = item.compareSource || "Recruitment";
+    if (!map.has(source)) map.set(source, []);
+    map.get(source).push(item);
+    return map;
+  }, new Map());
+  const options = [...groups.entries()].map(([source, items]) => `
+    <optgroup label="${escapeHtml(source)}">
+      ${items.map((item) => `<option value="${escapeHtml(item.compareKey || item.id)}">${escapeHtml(item.player)} - ${escapeHtml(item.role)} / ${escapeHtml(item.bestRole || "")}</option>`).join("")}
+    </optgroup>`).join("");
   return `<section class="selectors">
     <label>Player A<select id="selectedA"><option></option>${options}</select></label>
     <label>Player B<select id="selectedB"><option></option>${options}</select></label>
@@ -210,7 +219,8 @@ export function playerSelectors(players, a, b) {
 }
 
 export function playerSummaryCard(player, label) {
-  return `<article class="player-card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(player?.player || "No player")}</strong><small>${escapeHtml(player?.bestRole || "")}${player?.bestScore ? ` / ${fmt(player.bestScore)}` : ""}</small></article>`;
+  const source = player?.compareSource ? `${player.compareSource} / ` : "";
+  return `<article class="player-card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(player?.player || "No player")}</strong><small>${escapeHtml(source)}${escapeHtml(player?.bestRole || "")}${player?.bestScore ? ` / ${fmt(player.bestScore)}` : ""}</small></article>`;
 }
 
 export function metricCompare(rows, a, b) {

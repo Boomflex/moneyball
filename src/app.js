@@ -85,8 +85,8 @@ function setRows(rows) {
   state.importRoleLocked = importRole.locked;
   state.importReport = analyzeImport(rows, roles, importRole);
   state.players = recalcRows({ rows, roles, importRole: state.importRole, importRoleLocked: state.importRoleLocked });
-  state.selectedA = state.players[0]?.id ?? null;
-  state.selectedB = state.players[1]?.id ?? null;
+  state.selectedA = state.players[0] ? `recruit:${state.players[0].id}` : null;
+  state.selectedB = state.players[1] ? `recruit:${state.players[1].id}` : null;
   state.sortKey = "totalVfm";
   state.sortDir = "desc";
   state.databaseDivision = "All";
@@ -99,17 +99,36 @@ function setRows(rows) {
   render();
 }
 
-function filteredPlayers() {
+function matchesPlayerFilters(item) {
   const q = state.search.trim().toLowerCase();
-  const filtered = state.players.filter((item) => {
-    const roleMatch = state.roleFilter === "All" || item.role === state.roleFilter;
-    const minutesMatch = !state.minMinutes || (item.minutes ?? 0) >= state.minMinutes;
-    const ageMatch = item.age === null || item.age === undefined ? state.ageMin === 15 && state.ageMax === 45 : item.age >= state.ageMin && item.age <= state.ageMax;
-    const scoreMatch = !state.minScore || item.bestScore >= state.minScore;
-    const searchMatch = !q || [item.player, item.division, item.bestRole, item.archetype, item.dealFlag].join(" ").toLowerCase().includes(q);
-    return roleMatch && minutesMatch && ageMatch && scoreMatch && searchMatch;
-  });
-  return sortedRows(filtered);
+  const roleMatch = state.roleFilter === "All" || item.role === state.roleFilter;
+  const minutesMatch = !state.minMinutes || (item.minutes ?? 0) >= state.minMinutes;
+  const ageMatch = item.age === null || item.age === undefined ? state.ageMin === 15 && state.ageMax === 45 : item.age >= state.ageMin && item.age <= state.ageMax;
+  const scoreMatch = !state.minScore || item.bestScore >= state.minScore;
+  const searchMatch = !q || [item.player, item.division, item.bestRole, item.archetype, item.dealFlag, item.compareSource].join(" ").toLowerCase().includes(q);
+  return roleMatch && minutesMatch && ageMatch && scoreMatch && searchMatch;
+}
+
+function filteredPlayers() {
+  return sortedRows(state.players.filter(matchesPlayerFilters));
+}
+
+function comparePlayerPool() {
+  const recruitment = filteredPlayers().map((item) => ({
+    ...item,
+    compareKey: `recruit:${item.id}`,
+    compareSource: "Recruitment",
+  }));
+  const squad = sortedRows((state.squadBaseline?.players || []).filter(matchesPlayerFilters)).map((item) => ({
+    ...item,
+    compareKey: `squad:${item.id}`,
+    compareSource: "Saved squad",
+  }));
+  return [...recruitment, ...squad];
+}
+
+function selectedComparePlayer(value, pool, fallbackIndex) {
+  return pool.find((item) => item.compareKey === value || item.id === value) || pool[fallbackIndex] || pool[0] || null;
 }
 
 function activeColumnFilterCount(filters) {
@@ -1089,19 +1108,23 @@ function renderRoleSheets() {
 }
 
 function renderCompare() {
-  const players = filteredPlayers();
-  const a = players.find((item) => item.id === state.selectedA) || players[0];
-  const b = players.find((item) => item.id === state.selectedB) || players[1] || players[0];
+  const players = comparePlayerPool();
+  const a = selectedComparePlayer(state.selectedA, players, 0);
+  const b = selectedComparePlayer(state.selectedB, players, 1) || a;
+  state.selectedA = a?.compareKey || null;
+  state.selectedB = b?.compareKey || null;
   const role = roleById(roles, a?.role || "GK");
   const statsForRole = role?.scoreColumns.find((score) => a?.bestRole && score.label.includes(a.bestRole))?.stats || role?.scoreColumns[0]?.stats || [];
+  const percentilePool = [...state.players, ...(state.squadBaseline?.players || [])];
   const selectedStats = statsForRole.slice(0, 12).map((stat) => ({
     label: stat.header,
-    a: percentileForStat(a, stat, role, state.players),
-    b: percentileForStat(b, stat, role, state.players),
+    a: percentileForStat(a, stat, role, percentilePool),
+    b: percentileForStat(b, stat, role, percentilePool),
     aValue: a ? valueForStat(rowGetter(a.source), stat) : null,
     bValue: b ? valueForStat(rowGetter(b.source), stat) : null,
   }));
-  const peers = similarPlayers(a, state.players, roles).slice(0, 16);
+  const peerPool = a?.compareSource === "Saved squad" ? state.players : state.players.filter((item) => item.id !== a?.id);
+  const peers = similarPlayers(a, peerPool, roles).slice(0, 16);
   renderShell(`
     <section class="compare-grid">
       ${playerSelectors(players, a, b)}
