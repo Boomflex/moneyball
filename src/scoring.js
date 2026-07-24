@@ -3,6 +3,13 @@ import { clamp, mean, normalise, roleIdsFromPositionText, stdev } from "./utils.
 
 export const roleById = (roles, id) => roles.find((role) => role.id === id);
 
+const CONTROL_WEIGHTS = {
+  creation: 67.5,
+  scoring: 54,
+  pressure: 2.23,
+  possession: 7.66,
+};
+
 export function hasRoleHint(row, role) {
   const get = rowGetter(row);
   const text = [get("Best Position"), get("Other Positions"), get("Position"), get("Role")]
@@ -36,6 +43,78 @@ export function valueForStat(get, stat) {
   return raw;
 }
 
+function metricValue(get, headers, { percent = false } = {}) {
+  for (const header of headers) {
+    const raw = safeNumber(get(header));
+    if (raw === null) continue;
+    if (percent && raw > 1.5) return raw / 100;
+    return raw;
+  }
+  return null;
+}
+
+function positiveRatio(numerator, denominator) {
+  return Number.isFinite(numerator) && Number.isFinite(denominator) && denominator > 0 ? numerator / denominator : null;
+}
+
+function passesAttemptedPer90(get) {
+  const attempted = metricValue(get, ["Passes Attempted Per 90"]);
+  if (attempted !== null) return attempted;
+  const completed = metricValue(get, ["Passes Completed Per 90"]);
+  const completion = metricValue(get, ["Pass Completion %"], { percent: true });
+  return positiveRatio(completed, completion);
+}
+
+export function controlProfileForRow(row, role) {
+  const get = rowGetter(row);
+  const xAssists = metricValue(get, ["Expected Assists Per 90", "xAssists Per 90"]);
+  const openPlayKeyPasses = metricValue(get, ["Open Play Key Passes Per 90", "Key Passes Per 90"]);
+  const goals = metricValue(get, ["Goals Per 90"]);
+  const xGoals = metricValue(get, ["Expected Goals Per 90", "Non Penalty xGoals Per 90"]);
+  const shots = metricValue(get, ["Shots Per 90"]);
+  const pressuresWon = metricValue(get, ["Pressures Won Per 90", "Pressures Completed Per 90"]);
+  const pressuresAttempted = metricValue(get, ["Pressures Attempted Per 90"]);
+  const possessionWon = metricValue(get, ["Possession Won Per 90"]);
+  const possessionLost = metricValue(get, ["Possession Lost Per 90"]);
+  const passesAttempted = passesAttemptedPer90(get);
+
+  const creationRatio = positiveRatio(xAssists, openPlayKeyPasses);
+  const scoringRatio = positiveRatio(xGoals, shots);
+  const pressureRatio = positiveRatio(pressuresWon, pressuresAttempted);
+  const creationIndex = xAssists !== null && creationRatio !== null ? xAssists * creationRatio : null;
+  const scoringIndex = goals !== null && scoringRatio !== null ? goals * scoringRatio : null;
+  const pressureIndex = pressuresWon !== null && pressureRatio !== null ? pressuresWon * pressureRatio : null;
+  const possessionIndex = possessionWon;
+  const possessionLossRate = positiveRatio(possessionLost, passesAttempted);
+  const leagueName = String(get("Division") || "").trim();
+  const leagueStrength = Number(role.leagues[leagueName]?.strength) || 35;
+  const leagueAdjustment = leagueStrength / 55;
+
+  const components = [
+    creationIndex === null ? null : creationIndex * CONTROL_WEIGHTS.creation,
+    scoringIndex === null ? null : scoringIndex * CONTROL_WEIGHTS.scoring,
+    pressureIndex === null ? null : pressureIndex * CONTROL_WEIGHTS.pressure,
+    possessionIndex === null ? null : possessionIndex / CONTROL_WEIGHTS.possession,
+  ];
+  const componentCoverage = components.filter(Number.isFinite).length / components.length;
+  const subtotal = components.filter(Number.isFinite).reduce((sum, value) => sum + value, 0);
+  const raw = subtotal > 0 && possessionLossRate !== null
+    ? subtotal * possessionLossRate * leagueAdjustment
+    : null;
+
+  return {
+    controlRaw: raw,
+    controlScore: null,
+    controlCoverage: raw === null ? 0 : (componentCoverage * 0.8) + 0.2,
+    controlCreation: creationIndex,
+    controlScoring: scoringIndex,
+    controlPressure: pressureIndex,
+    controlPossession: possessionIndex,
+    controlLossRate: possessionLossRate,
+    controlLeagueAdjustment: leagueAdjustment,
+  };
+}
+
 export function scoreRole(row, role) {
   const get = rowGetter(row);
   const scores = role.scoreColumns.map((score) => {
@@ -65,8 +144,8 @@ export function scoreRole(row, role) {
   const best = validScores.reduce((top, item) => item.score > top.score ? item : top, validScores[0]);
   const playerName = get("Player Name") || get("Player") || get("Name");
   const age = safeNumber(get("Age"));
-  const actualValue = safeNumber(get("Actual Value (£)")) ?? safeNumber(get("Actual Value")) ?? safeNumber(get("Value"));
-  const actualWage = safeNumber(get("Actual Wage (£/wk)")) ?? safeNumber(get("Actual Wage")) ?? safeNumber(get("Wage"));
+  const actualValue = safeNumber(get("Actual Value")) ?? safeNumber(get("Value"));
+  const actualWage = safeNumber(get("Actual Wage")) ?? safeNumber(get("Wage"));
   const league = role.leagues[String(get("Division") || "").trim()];
   const expectedValue = league && age !== null && [league.valueScoreCoef, league.valueAgeCoef, league.valueIntercept].every(Number.isFinite)
     ? Math.exp(league.valueScoreCoef * best.score + league.valueAgeCoef * age + league.valueIntercept)
@@ -94,6 +173,7 @@ export function scoreRole(row, role) {
     valueRatio: expectedValue && actualValue ? expectedValue / actualValue : null,
     wageRatio: expectedWage && actualWage ? expectedWage / actualWage : null,
     archetype,
+    ...controlProfileForRow(row, role),
     source: row,
   };
 }
@@ -140,6 +220,7 @@ export function recalcRows({ rows, roles, importRole, importRoleLocked }) {
 
   for (const role of roles) {
     const group = entries.filter((item) => item.role === role.id);
+    const controlAvg = mean(group.map((item) => item.controlRaw).filter(Number.isFinite));
     const scoreAvg = mean(group.map((item) => item.bestScore));
     const scoreSd = stdev(group.map((item) => item.bestScore));
     const valueAvg = mean(group.map((item) => item.actualValue).filter(Number.isFinite));
@@ -152,6 +233,7 @@ export function recalcRows({ rows, roles, importRole, importRoleLocked }) {
       const zWage = item.actualWage ? (wageAvg - item.actualWage) / wageSd : 0;
       item.totalVfm = zScore + zValue + zWage;
       item.dealFlag = dealFlag(item, role);
+      item.controlScore = controlAvg && Number.isFinite(item.controlRaw) ? (item.controlRaw / controlAvg) * 100 : null;
     }
   }
   entries.sort((a, b) => b.totalVfm - a.totalVfm);
