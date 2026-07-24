@@ -55,6 +55,8 @@ export function labelFor(col) {
     controlScore: "Control",
     controlCoverage: "Control conf",
     bestRole: "Role fit",
+    matchedRoles: "Role scores",
+    roleCount: "Roles",
     actualValue: "Actual value",
     expectedValue: "Exp value",
     valueRatio: "VFM",

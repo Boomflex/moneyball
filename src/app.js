@@ -291,7 +291,7 @@ function updateScoutRecord(id, patch) {
 
 function databaseStatusCounts(players) {
   const counts = Object.fromEntries(DATABASE_STATUSES.map((status) => [status, 0]));
-  for (const player of players) counts[scoutRecord(player).status] += 1;
+  for (const player of players) counts[player.scoutStatus || scoutRecord(player).status] += 1;
   return counts;
 }
 
@@ -299,6 +299,58 @@ function databaseDealOptions(players) {
   return [...new Set(players.map((item) => item.dealFlag).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b)));
 }
 
+function statusWeight(status) {
+  return { Saved: 5, Scout: 4, Watch: 3, New: 2, Ignore: 1 }[status] || 0;
+}
+
+function priorityWeight(priority) {
+  return { A: 3, B: 2, C: 1 }[priority] || 0;
+}
+
+function bestScoutRecord(entries) {
+  const records = entries.map((entry) => scoutRecord(entry));
+  return records.reduce((best, record) => {
+    if (statusWeight(record.status) !== statusWeight(best.status)) return statusWeight(record.status) > statusWeight(best.status) ? record : best;
+    if (priorityWeight(record.priority) !== priorityWeight(best.priority)) return priorityWeight(record.priority) > priorityWeight(best.priority) ? record : best;
+    if (!best.notes && record.notes) return record;
+    return best;
+  }, records[0] || scoutRecord(null));
+}
+
+function bestDealFlag(entries) {
+  const flags = entries.map((entry) => entry.dealFlag).filter(Boolean);
+  for (const preferred of ["FREE - bargain", "Great value", "Fair price", "Free agent", "No league data", "Overpriced"]) {
+    if (flags.includes(preferred)) return preferred;
+  }
+  return flags[0] || "";
+}
+
+function databasePlayerRecords(players) {
+  const groups = new Map();
+  for (const player of players) {
+    const key = player.source || player.id;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(player);
+  }
+
+  return [...groups.values()].map((entries) => {
+    const sorted = [...entries].sort((a, b) => b.bestScore - a.bestScore || b.totalVfm - a.totalVfm);
+    const primary = sorted[0];
+    const record = bestScoutRecord(sorted);
+    const roleSummary = sorted.map((entry) => `${entry.role} ${fmt(entry.bestScore)}`).join(" / ");
+    return {
+      ...primary,
+      modelRank: Math.min(...sorted.map((entry) => entry.rank).filter(Number.isFinite)),
+      matchedRoles: roleSummary,
+      roleCount: sorted.length,
+      scoutStatus: record.status,
+      priority: record.priority,
+      notes: record.notes,
+      dealFlag: bestDealFlag(sorted),
+      roleEntries: sorted,
+    };
+  });
+}
 function databasePassesScoutFilters(player) {
   const record = scoutRecord(player);
   const statusMatch = state.databaseStatus === "All"
@@ -309,17 +361,8 @@ function databasePassesScoutFilters(player) {
   return statusMatch && priorityMatch && dealMatch;
 }
 
-function databaseRows(players, statColumns) {
-  return roleSheetRows(players, statColumns).map((row) => {
-    const record = scoutRecord(row);
-    return {
-      ...row,
-      modelRank: row.rank,
-      scoutStatus: record.status,
-      priority: record.priority,
-      notes: record.notes,
-    };
-  });
+function databaseRows(players) {
+  return players;
 }
 
 function databaseCompactSummary(players, visiblePlayers) {
@@ -339,10 +382,10 @@ function databaseCompactSummary(players, visiblePlayers) {
   </section>`;
 }
 
-function databaseToolDrawer(statOptions, leaderRows, selectedStat) {
+function databaseToolDrawer() {
   return `<details class="database-tool-drawer">
-    <summary><span>Views and stat leaders</span><strong>${state.databaseViews.length} saved views / ${leaderRows.length} leaders</strong></summary>
-    ${databaseUtilityPanels(statOptions, leaderRows, selectedStat)}
+    <summary><span>Saved views</span><strong>${state.databaseViews.length} saved view${state.databaseViews.length === 1 ? "" : "s"}</strong></summary>
+    <section class="database-utility-grid saved-only">${databaseSavedViewsPanel()}</section>
   </details>`;
 }
 function databaseViewButtons() {
@@ -703,10 +746,6 @@ function renderShell(content, options = {}) {
       <nav class="tabs" aria-label="Primary">
         ${tabs.map((tab) => `<button class="${state.activeTab === tab.id ? "active" : ""}" data-tab="${tab.id}">${tab.label}</button>`).join("")}
       </nav>
-      <div class="toolbar header-actions">
-        <button class="ghost" data-action="template">Template</button>
-        <button class="primary" data-action="sample">Demo data</button>
-      </div>
       <aside class="credits-bar">Spreadsheet by <a href="https://x.com/MattFitz94" target="_blank" rel="noopener noreferrer">Matt Fitzgerald</a> and <a href="https://x.com/Thecultof" target="_blank" rel="noopener noreferrer">Jack</a> from <a href="https://www.youtube.com/@TheCultofFM" target="_blank" rel="noopener noreferrer">TheCultofFM</a>; additional ideas from <a href="https://x.com/nstntly" target="_blank" rel="noopener noreferrer">Willum</a></aside>
     </header>
     <main class="workspace${workspaceClass}">
@@ -767,8 +806,6 @@ function controls() {
 
 function bindGlobal() {
   app.querySelectorAll("[data-tab]").forEach((button) => button.addEventListener("click", () => setTab(button.dataset.tab)));
-  app.querySelector("[data-action='template']")?.addEventListener("click", () => download("moneyball-import-template.csv", `${templateHeaders(roles).join(",")}\n`));
-  app.querySelector("[data-action='sample']")?.addEventListener("click", () => setRows(parseCsv(sampleCsv())));
   app.querySelector("[data-dismiss-storage-warning]")?.addEventListener("click", () => { state.storageWarning = ""; render(); });
   app.querySelector("#roleFilter")?.addEventListener("change", (event) => { state.roleFilter = event.target.value; render(); });
   app.querySelector("#search")?.addEventListener("input", (event) => {
@@ -901,23 +938,10 @@ function rolesWithRows() {
 }
 
 function renderPlayerDatabase() {
-  const basePlayers = filteredPlayers();
+  const baseEntries = filteredPlayers();
+  const basePlayers = databasePlayerRecords(baseEntries);
   const divisionOptions = databaseDivisionOptions(basePlayers);
   if (state.databaseDivision !== "All" && !divisionOptions.includes(state.databaseDivision)) state.databaseDivision = "All";
-
-  const statOptions = databaseStatOptions();
-  if (!state.leaderStat || !statOptions.some((stat) => stat.header === state.leaderStat)) {
-    state.leaderStat = statOptions[0]?.header || "";
-  }
-  let selectedStats = databaseSelectedStats(statOptions);
-  if (!state.databaseVisibleStats.length && selectedStats.length) {
-    state.databaseVisibleStats = selectedStats.map((stat) => stat.header);
-    selectedStats = databaseSelectedStats(statOptions);
-  }
-  const statHeaders = new Set(selectedStats.map((stat) => stat.header));
-  if (!state.databaseStatPicker || !statOptions.some((stat) => stat.header === state.databaseStatPicker)) {
-    state.databaseStatPicker = statOptions.find((stat) => !statHeaders.has(stat.header))?.header || statOptions[0]?.header || "";
-  }
 
   const divisionPlayers = state.databaseDivision === "All"
     ? basePlayers
@@ -926,25 +950,19 @@ function renderPlayerDatabase() {
   if (state.databaseDeal !== "All" && !dealOptions.includes(state.databaseDeal)) state.databaseDeal = "All";
 
   const databasePlayers = divisionPlayers.filter(databasePassesScoutFilters);
-  const selectedLeaderStat = statOptions.find((stat) => stat.header === state.leaderStat) || statOptions[0] || null;
-  const leaderRows = statLeaderRows(databasePlayers, selectedLeaderStat);
-  const statColumns = selectedStats.map(statColumnKey);
-  const columns = ["scoutStatus", "priority", "player", "role", "bestRole", "division", "age", "minutes", "bestScore", "controlScore", "totalVfm", "valueRatio", "actualValue", "actualWage", "dealFlag", "notes", ...statColumns];
-  const fullRows = databaseRows(databasePlayers, selectedStats);
+  const columns = ["scoutStatus", "priority", "player", "bestRole", "matchedRoles", "division", "age", "minutes", "bestScore", "controlScore", "valueRatio", "actualValue", "actualWage", "dealFlag", "notes"];
+  const fullRows = databaseRows(databasePlayers);
   const filteredRows = applyColumnFilters(fullRows, columns, state.databaseFilters);
   const rows = sortedRows(filteredRows);
   const filterCount = activeDatabaseFilterCount();
-  const filterableColumns = columns.filter((col) => !["scoutStatus", "priority", "player", "role", "bestRole", "division", "dealFlag", "notes"].includes(col));
-  const selectedChips = selectedStats.map((stat) => `
-    <button class="stat-chip" data-db-remove-stat="${escapeHtml(stat.header)}" type="button">${escapeHtml(labelFor(statColumnKey(stat)))} <span>x</span></button>
-  `).join("");
-  const noteCount = basePlayers.filter((player) => scoutRecord(player).notes).length;
+  const filterableColumns = ["age", "minutes", "bestScore", "controlScore", "valueRatio", "actualValue", "actualWage"];
+  const noteCount = basePlayers.filter((player) => player.notes).length;
 
   renderShell(`
     ${databaseCompactSummary(basePlayers, databasePlayers)}
     <section class="panel database-panel compact-database-panel">
       <div class="panel-head">
-        <div><span>Master scouting pool</span><h2>Player Database</h2></div>
+        <div><span>Scouting CRM</span><h2>Player Database</h2></div>
         <div class="toolbar">
           ${filterCount ? `<button class="ghost" id="clearDatabaseFilters" type="button">Clear ${filterCount} filter${filterCount === 1 ? "" : "s"}</button>` : ""}
           <button class="ghost" id="resetScouting" type="button">Reset scouting</button>
@@ -952,7 +970,7 @@ function renderPlayerDatabase() {
         </div>
       </div>
       ${databaseViewButtons()}
-      <div class="database-tools database-scout-tools">
+      <div class="database-tools database-scout-tools database-crm-tools">
         <label>Status
           <select id="databaseStatus">
             ${["Active", "All", ...DATABASE_STATUSES].map((status) => `<option ${state.databaseStatus === status ? "selected" : ""}>${escapeHtml(status)}</option>`).join("")}
@@ -975,20 +993,10 @@ function renderPlayerDatabase() {
             ${divisionOptions.map((division) => `<option ${state.databaseDivision === division ? "selected" : ""}>${escapeHtml(division)}</option>`).join("")}
           </select>
         </label>
-        <label>Add stat column
-          <select id="databaseStatPicker">
-            ${statOptions.map((stat) => `<option value="${escapeHtml(stat.header)}" ${state.databaseStatPicker === stat.header ? "selected" : ""}>${escapeHtml(labelFor(statColumnKey(stat)))}</option>`).join("")}
-          </select>
-        </label>
-        <div class="database-actions">
-          <button class="primary" id="addDatabaseStat" type="button">Add stat</button>
-          <button class="ghost" id="resetDatabaseStats" type="button">Reset stats</button>
-        </div>
       </div>
-      <div class="selected-stats">${selectedChips || `<span>No stats selected.</span>`}</div>
-      <div class="database-summary"><strong>${rows.length}</strong> of ${divisionPlayers.length} players shown / ${selectedStats.length} stat columns / ${noteCount} saved notes</div>
-      ${databaseToolDrawer(statOptions, leaderRows, selectedLeaderStat)}
-      ${table(rows, columns, "database-table", { filterableColumns, filters: state.databaseFilters, openFilter: state.openDatabaseFilter })}
+      <div class="database-summary"><strong>${rows.length}</strong> of ${divisionPlayers.length} players shown / ${baseEntries.length} role entries / ${noteCount} saved notes</div>
+      ${databaseToolDrawer()}
+      ${table(rows, columns, "database-table database-crm-table", { filterableColumns, filters: state.databaseFilters, openFilter: state.openDatabaseFilter })}
     </section>
   `, { showImportReport: false, workspaceClass: "database" });
   bindTable();
