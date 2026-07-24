@@ -804,7 +804,8 @@ function renderImport() {
     <section class="import-hero">
       <div class="hero-copy">
         <span>FM26 CSV intake</span>
-        <h1>Turn raw export noise into a recruitment shortlist.</h1>
+        <h1>Import FM26 CSV export.</h1>
+        <p>Drop a squad or role file and the workbook model will build the database, role sheets, compare views, and squad planner.</p>
       </div>
       <div class="hero-metrics" aria-label="Model coverage">
         <article><span>Roles</span><strong>${roles.length}</strong></article>
