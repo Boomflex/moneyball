@@ -126,7 +126,7 @@ export function table(rows, columns, className = "", options = {}) {
   if (!rows.length) return `<div class="empty">No rows yet.</div>`;
   return `<div class="table-wrap"><table class="${className}">
     <thead><tr>${columns.map((col) => headerCell(col, options)).join("")}</tr></thead>
-    <tbody>${rows.map((row) => `<tr${rowClassAttr(row, options)}>${columns.map((col) => `<td>${formatCell(row, col)}</td>`).join("")}</tr>`).join("")}</tbody>
+    <tbody>${rows.map((row) => `<tr${rowClassAttr(row, options)}${rowAttrs(row, options)}>${columns.map((col) => `<td>${formatCell(row, col)}</td>`).join("")}</tr>`).join("")}</tbody>
   </table></div>`;
 }
 
@@ -135,14 +135,23 @@ function rowClassAttr(row, options) {
   return value ? ` class="${escapeHtml(value)}"` : "";
 }
 
+function rowAttrs(row, options) {
+  const attrs = typeof options.rowAttributes === "function" ? options.rowAttributes(row) : {};
+  return Object.entries(attrs || {})
+    .filter(([, value]) => value !== null && value !== undefined && value !== false)
+    .map(([key, value]) => ` ${escapeHtml(key)}="${escapeHtml(value === true ? "" : value)}"`)
+    .join("");
+}
+
 function headerCell(col, options) {
   const filterable = options.filterableColumns?.includes(col);
   const filter = options.filters?.[col] || {};
   const hasFilter = filter.min !== "" && filter.min !== undefined || filter.max !== "" && filter.max !== undefined;
   const open = options.openFilter === col;
+  const sortable = options.sortable !== false;
   return `<th>
     <div class="th-tools">
-      <button data-sort="${escapeHtml(col)}">${labelFor(col)}</button>
+      ${sortable ? `<button data-sort="${escapeHtml(col)}">${labelFor(col)}</button>` : `<span>${labelFor(col)}</span>`}
       ${filterable ? `<button class="filter-toggle ${hasFilter ? "is-active" : ""}" data-filter-toggle="${escapeHtml(col)}" aria-label="Filter ${escapeHtml(labelFor(col))}">v</button>` : ""}
     </div>
     ${open ? filterPopover(col, filter) : ""}

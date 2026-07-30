@@ -1,12 +1,13 @@
 import { WORKBOOK_MODEL } from "./model.js";
-import { applyLeagueOverrides } from "./league-overrides.js";
-import { analyzeImport, inferImportRole, parseCsv, rowGetter } from "./importer.js";
+import { applyLeagueOverrides, resolveLeague } from "./league-overrides.js";
+import { analyzeImport, inferImportRole, parseCsv, rowGetter, templateHeaders } from "./importer.js";
 import {
   allRoleStatColumns,
   percentileForStat,
   valueForStat,
   recalcRows,
   roleById,
+  scoreProfileForPlayer,
   roleSheetRows,
   roleStatColumns,
   similarPlayers,
@@ -60,16 +61,17 @@ const state = {
   squadBaseline: loadSquadBaseline(),
   databaseViewName: "",
   databaseSavedView: "",
+  databaseAuditId: null,
   leaderStat: "",
   storageWarning: initialStorageWarning,
 };
 
 const tabs = [
   { id: "Import", label: "Import" },
-  { id: "Database", label: "Database" },
-  { id: "Role Sheets", label: "Role Sheets" },
+  { id: "Role Sheets", label: "Workbook" },
+  { id: "Database", label: "Recruitment" },
   { id: "Compare", label: "Compare" },
-  { id: "Squad Planner", label: "Squad Planner" },
+  { id: "Squad Planner", label: "Squad" },
   { id: "Model", label: "Model" },
 ];
 
@@ -95,6 +97,7 @@ function setRows(rows) {
   state.databaseStatus = "Active";
   state.databasePriority = "All";
   state.databaseDeal = "All";
+  state.databaseAuditId = null;
   state.activeTab = "Database";
   render();
 }
@@ -403,7 +406,7 @@ function databaseCompactSummary(players, visiblePlayers) {
 
 function databaseToolDrawer() {
   return `<details class="database-tool-drawer">
-    <summary><span>Saved views</span><strong>${state.databaseViews.length} saved view${state.databaseViews.length === 1 ? "" : "s"}</strong></summary>
+    <summary><span>Recruitment views</span><strong>${state.databaseViews.length} saved view${state.databaseViews.length === 1 ? "" : "s"}</strong></summary>
     <section class="database-utility-grid saved-only">${databaseSavedViewsPanel()}</section>
   </details>`;
 }
@@ -417,11 +420,11 @@ function databaseViewButtons() {
     return false;
   };
   const views = [
-    ["active", "Active pool"],
+    ["active", "Active board"],
     ["shortlist", "Shortlist"],
     ["scout", "Scout next"],
     ["watch", "Watchlist"],
-    ["value", "Value finds"],
+    ["value", "Workbook value"],
   ];
   return `<div class="database-views" aria-label="Database views">
     ${views.map(([view, label]) => `<button class="${isActive(view) ? "active" : ""}" data-database-view="${view}" type="button">${label}</button>`).join("")}
@@ -598,7 +601,7 @@ function databaseSelectedStats(options) {
 function databaseSavedViewsPanel() {
   const options = state.databaseViews.map((view) => `<option value="${escapeHtml(view.name)}" ${state.databaseSavedView === view.name ? "selected" : ""}>${escapeHtml(view.name)}</option>`).join("");
   return `<section class="utility-panel saved-views-panel">
-    <div class="panel-head compact"><div><span>Custom views</span><h2>Saved Database Views</h2></div></div>
+    <div class="panel-head compact"><div><span>Board views</span><h2>Saved Recruitment Views</h2></div></div>
     <div class="saved-view-controls">
       <label>Saved view
         <select id="databaseSavedView"><option value="">Choose view</option>${options}</select>
@@ -844,7 +847,7 @@ function renderImport() {
         <small id="fileStatus">No file selected</small>
       </section>
       <section class="schema-panel">
-        <div class="panel-head compact"><div><span>Workbook coverage</span><h2>Input maps</h2></div></div>
+        <div class="panel-head compact"><div><span>Workbook coverage</span><h2>Input maps</h2></div><button class="ghost" id="downloadTemplate" type="button">CSV template</button></div>
         <div class="schema-list">
           ${roles.map((role) => `<details><summary>${role.id}<small>${role.rawHeaders.length} inputs / ${role.scoreColumns.length} scores</small></summary><p>${role.rawHeaders.join(", ")}</p></details>`).join("")}
         </div>
@@ -867,6 +870,11 @@ function renderImport() {
     updateFileStatus(file);
     importFile(file);
   });
+  app.querySelector("#downloadTemplate")?.addEventListener("click", downloadCsvTemplate);
+}
+
+function downloadCsvTemplate() {
+  download("moneyball-import-template.csv", templateHeaders(roles).map(csvCell).join(","));
 }
 
 function updateFileStatus(file) {
@@ -889,6 +897,63 @@ function rolesWithRows() {
   return roles.filter((role) => roleIds.has(role.id));
 }
 
+function databaseScoreAuditRows(player) {
+  if (!player) return [];
+  const role = roleById(roles, player.role);
+  const profile = role ? scoreProfileForPlayer(player, role) : null;
+  if (!role || !profile) return [];
+  const get = rowGetter(player.source);
+  const league = resolveLeague(role, get("Division"));
+  const leagueStrength = Number(league.data?.strength) || 35;
+  return profile.stats.map((stat) => {
+    const value = valueForStat(get, stat);
+    const z = value === null || !stat.stdev ? null : stat.direction * ((value - stat.mean) / stat.stdev);
+    const contribution = z === null ? null : (stat.weight * z / profile.denominator) * (leagueStrength / 55) * 10;
+    return {
+      metric: labelFor(statColumnKey(stat)),
+      value: {
+        value,
+        __html: value === null ? '<span class="muted-cell">Missing</span>' : escapeHtml(formatStatValue({ label: stat.header, value })),
+      },
+      benchmark: {
+        value: stat.mean,
+        __html: escapeHtml(formatStatValue({ label: stat.header, value: stat.mean })),
+      },
+      weight: stat.weight,
+      contribution: {
+        value: contribution,
+        __html: contribution === null
+          ? '<span class="muted-cell">No effect</span>'
+          : `<span class="${contribution >= 0 ? "score-positive" : "score-negative"}">${fmt(contribution)}</span>`,
+      },
+    };
+  }).sort((a, b) => Math.abs(b.contribution.value || 0) - Math.abs(a.contribution.value || 0));
+}
+
+function databaseScoreAuditPanel(player) {
+  if (!player) return `<section class="panel score-audit-panel"><div class="empty">Import players to audit a workbook score.</div></section>`;
+  const role = roleById(roles, player.role);
+  const profile = role ? scoreProfileForPlayer(player, role) : null;
+  const rows = databaseScoreAuditRows(player).slice(0, 10);
+  const get = rowGetter(player.source);
+  const league = role ? resolveLeague(role, get("Division")) : null;
+  const coverage = Number.isFinite(player.coverage) ? `${fmt(player.coverage * 100)}%` : "";
+  const leagueNote = league?.aliasFrom ? `${league.aliasFrom} -> ${league.name}` : league?.name || player.division;
+  return `<section class="panel score-audit-panel">
+    <div class="panel-head">
+      <div><span>Workbook score audit</span><h2>${escapeHtml(player.player)}</h2></div>
+      <strong>${escapeHtml(player.role)} / ${escapeHtml(player.bestRole)}</strong>
+    </div>
+    <section class="audit-summary">
+      <article><span>Score</span><strong>${fmt(player.bestScore)}</strong></article>
+      <article><span>Total VFM</span><strong>${fmt(player.totalVfm)}</strong></article>
+      <article><span>Coverage</span><strong>${escapeHtml(coverage)}</strong></article>
+      <article><span>Deal</span><strong>${escapeHtml(player.dealFlag || "-")}</strong></article>
+    </section>
+    <p class="lede">${escapeHtml(profile?.label || "Workbook score")} using ${escapeHtml(leagueNote)} league strength. Contributions show each metric's estimated effect on the final score.</p>
+    ${table(rows, ["metric", "value", "benchmark", "weight", "contribution"], "audit-table", { sortable: false })}
+  </section>`;
+}
 function renderPlayerDatabase() {
   const baseEntries = filteredPlayers();
   const basePlayers = databasePlayerRecords(baseEntries);
@@ -902,19 +967,22 @@ function renderPlayerDatabase() {
   if (state.databaseDeal !== "All" && !dealOptions.includes(state.databaseDeal)) state.databaseDeal = "All";
 
   const databasePlayers = divisionPlayers.filter(databasePassesScoutFilters);
-  const columns = ["scoutStatus", "priority", "player", "bestRole", "matchedRoles", "division", "age", "minutes", "bestScore", "controlScore", "valueRatio", "actualValue", "actualWage", "dealFlag", "notes"];
+  const columns = ["player", "bestRole", "matchedRoles", "division", "age", "minutes", "bestScore", "totalVfm", "valueRatio", "actualValue", "actualWage", "dealFlag", "scoutStatus", "priority", "notes"];
   const fullRows = databaseRows(databasePlayers);
   const filteredRows = applyColumnFilters(fullRows, columns, state.databaseFilters);
   const rows = sortedRows(filteredRows);
+  const selectedAudit = rows.find((item) => item.id === state.databaseAuditId) || rows[0] || null;
+  state.databaseAuditId = selectedAudit?.id || null;
   const filterCount = activeDatabaseFilterCount();
-  const filterableColumns = ["age", "minutes", "bestScore", "controlScore", "valueRatio", "actualValue", "actualWage"];
+  const filterableColumns = ["age", "minutes", "bestScore", "totalVfm", "valueRatio", "actualValue", "actualWage"];
   const noteCount = basePlayers.filter((player) => player.notes).length;
 
   renderShell(`
     ${databaseCompactSummary(basePlayers, databasePlayers)}
+    ${databaseScoreAuditPanel(selectedAudit)}
     <section class="panel database-panel compact-database-panel">
       <div class="panel-head">
-        <div><span>Scouting CRM</span><h2>Player Database</h2></div>
+        <div><span>Workbook recruitment</span><h2>Recruitment Board</h2></div>
         <div class="toolbar">
           ${filterCount ? `<button class="ghost" id="clearDatabaseFilters" type="button">Clear ${filterCount} filter${filterCount === 1 ? "" : "s"}</button>` : ""}
           <button class="ghost" id="resetScouting" type="button">Reset scouting</button>
@@ -948,13 +1016,18 @@ function renderPlayerDatabase() {
       </div>
       <div class="database-summary"><strong>${rows.length}</strong> of ${divisionPlayers.length} players shown / ${baseEntries.length} role entries / ${noteCount} saved notes</div>
       ${databaseToolDrawer()}
-      ${table(rows, columns, "database-table database-crm-table", { filterableColumns, filters: state.databaseFilters, openFilter: state.openDatabaseFilter })}
+      ${table(rows, columns, "database-table database-crm-table", { filterableColumns, filters: state.databaseFilters, openFilter: state.openDatabaseFilter, rowClass: (row) => row.id === state.databaseAuditId ? "selected-row" : "", rowAttributes: (row) => ({ "data-audit-player": row.id }) })}
     </section>
-  `, { showImportReport: false, workspaceClass: "database" });
+  `, { workspaceClass: "database" });
   bindTable();
   bindDatabaseControls(rows, columns);
 }
 function bindDatabaseControls(rows, columns) {
+  app.querySelectorAll("[data-audit-player]").forEach((row) => row.addEventListener("click", (event) => {
+    if (event.target.closest("button, input, select, textarea, a, label")) return;
+    state.databaseAuditId = row.dataset.auditPlayer;
+    render();
+  }));
   app.querySelectorAll("[data-database-view]").forEach((button) => button.addEventListener("click", () => applyDatabaseView(button.dataset.databaseView)));
   app.querySelector("#databaseSavedView")?.addEventListener("change", (event) => { state.databaseSavedView = event.target.value; });
   app.querySelector("#databaseViewName")?.addEventListener("input", (event) => { state.databaseViewName = event.target.value; });
@@ -1025,7 +1098,7 @@ function bindDatabaseControls(rows, columns) {
   app.querySelectorAll("[data-scout-notes]").forEach((input) => input.addEventListener("change", (event) => {
     updateScoutRecord(input.dataset.scoutNotes, { notes: event.target.value });
   }));
-  app.querySelector("#exportDatabase")?.addEventListener("click", () => download("moneyball-player-database.csv", toCsvColumns(rows, columns)));
+  app.querySelector("#exportDatabase")?.addEventListener("click", () => download("moneyball-recruitment-board.csv", toCsvColumns(rows, columns)));
 }
 function renderSquadPlanner() {
   const rows = squadPlannerRows();
@@ -1157,11 +1230,16 @@ function renderModel() {
     return `<section class="panel"><div class="panel-head"><div><span>League baseline</span><h2>${role.id}</h2></div></div>${table(rows, ["rank", "league", "strength"])}</section>`;
   }).join("");
   const archetypes = state.roleFilter === "All" ? model.archetypes : model.archetypes.filter((item) => item.role === state.roleFilter);
+  const sourceName = String(model.sourceWorkbook || "Workbook model").split(/[\\/]/).pop();
+  const sourcePanel = `<section class="panel model-source-card">
+    <div class="panel-head"><div><span>Canonical workbook</span><h2>E14 Source Model</h2></div><strong>${roles.length} roles / ${model.archetypes.length} archetypes</strong></div>
+    <p class="lede">Scoring weights, league baselines, expected value, expected wage and archetype guidance are generated from ${escapeHtml(sourceName)}.</p>
+  </section>`;
   renderShell(`
     <section class="model-layout">
-      <section class="stack model-standards">${leagueSections}</section>
+      <section class="stack model-standards">${sourcePanel}${leagueSections}</section>
       <section class="panel model-guide control-model-card">
-        <div class="panel-head"><div><span>Experimental model</span><h2>Control Score</h2></div></div>
+        <div class="panel-head"><div><span>Experimental lab</span><h2>Control Score Lab</h2></div></div>
         <div class="guide-grid compact-guide">
           <article class="guide-card">
             <span>Creation</span>
@@ -1190,7 +1268,7 @@ function renderModel() {
         </div>
       </section>
       <section class="panel model-guide">
-        <div class="panel-head"><div><span>Workbook guide</span><h2>Archetypes</h2></div></div>
+        <div class="panel-head"><div><span>Workbook model</span><h2>Archetypes</h2></div></div>
         <div class="guide-grid compact-guide">
           ${archetypes.map((item) => `
             <article class="guide-card">

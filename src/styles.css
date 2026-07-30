@@ -795,7 +795,8 @@ th {
   background: #19103D;
 }
 
-th button {
+th button,
+th .th-tools span {
   color: var(--ink);
   background: transparent;
   border: 0;
@@ -1108,7 +1109,8 @@ tbody tr.selected-row:hover {
   text-align: right;
 }
 
-.role-table th button {
+.role-table th button,
+.role-table th .th-tools span {
   max-width: 112px;
   white-space: normal;
   line-height: 1.15;
@@ -1158,6 +1160,74 @@ tbody tr.selected-row:hover {
   padding-block: 6px;
 }
 
+.score-audit-panel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.audit-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.audit-summary article {
+  min-width: 0;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(10, 15, 30, .68);
+}
+
+.audit-summary span {
+  display: block;
+  overflow: hidden;
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.audit-summary strong {
+  display: block;
+  margin-top: 4px;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 17px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.audit-table {
+  min-width: 760px;
+}
+
+.audit-table th:nth-child(n+2),
+.audit-table td:nth-child(n+2) {
+  text-align: right;
+}
+
+.audit-table td:first-child {
+  font-weight: 850;
+}
+
+.score-positive {
+  color: var(--green);
+  font-weight: 950;
+}
+
+.score-negative {
+  color: var(--red);
+  font-weight: 950;
+}
+
+.muted-cell {
+  color: var(--muted);
+}
 .database-compact-summary {
   display: grid;
   grid-template-columns: repeat(6, minmax(120px, 1fr));
@@ -1454,7 +1524,8 @@ tbody tr.selected-row:hover {
   text-align: right;
 }
 
-.database-table th button {
+.database-table th button,
+.database-table th .th-tools span {
   max-width: 118px;
   white-space: normal;
   line-height: 1.15;
@@ -1686,6 +1757,7 @@ tbody tr.selected-row:hover {
   }
 
   .stats,
+  .audit-summary,
   .database-compact-summary,
   .import-report {
     grid-template-columns: repeat(2, minmax(150px, 1fr));
@@ -1730,6 +1802,7 @@ tbody tr.selected-row:hover {
   }
 
   .stats,
+  .audit-summary,
   .database-compact-summary,
   .import-report,
   .hero-metrics {
