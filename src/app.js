@@ -1201,7 +1201,7 @@ function renderCompare() {
   renderShell(`
     <section class="compare-grid">
       ${playerSelectors(players, a, b)}
-      <section class="panel chart-panel">
+      <section class="panel chart-panel compare-chart-panel">
         <div class="panel-head"><div><span>${escapeHtml(role?.id || "Role")}</span><h2>Player Compare</h2></div></div>
         ${radar(selectedStats)}
       </section>
@@ -1215,7 +1215,7 @@ function renderCompare() {
         ${table(peers, ["rank", "player", "role", "bestRole", "archetype", "division", "similarity", "bestScore", "dealFlag"], "similarity-table")}
       </section>
     </section>
-  `);
+  `, { showImportReport: false, workspaceClass: "compare" });
   bindSelectors();
   bindTable();
 }

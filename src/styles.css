@@ -1059,6 +1059,153 @@ tbody tr.selected-row:hover {
   text-anchor: middle;
 }
 
+.workspace-compare {
+  gap: 10px;
+  padding-top: 12px;
+}
+
+.workspace-compare .controls {
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 12px;
+}
+
+.workspace-compare .controls > label {
+  min-width: 130px;
+}
+
+.workspace-compare .range-filter {
+  min-width: 154px;
+  gap: 5px;
+  padding: 7px 9px;
+  border-radius: 10px;
+}
+
+.workspace-compare .range-filter.age-filter {
+  min-width: 210px;
+}
+
+.workspace-compare input,
+.workspace-compare select {
+  min-height: 32px;
+  padding-block: 5px;
+}
+
+.workspace-compare .selectors {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) minmax(160px, .42fr) minmax(160px, .42fr);
+  gap: 8px;
+  align-items: end;
+}
+
+.workspace-compare .selectors label {
+  min-width: 0;
+}
+
+.workspace-compare .selectors article {
+  min-width: 0;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.workspace-compare .player-card strong {
+  margin-top: 2px;
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-compare .player-card small {
+  display: block;
+  margin-top: 2px;
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-compare .compare-grid {
+  grid-template-columns: minmax(480px, 1fr) minmax(390px, .74fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.workspace-compare .panel-head {
+  margin-bottom: 8px;
+}
+
+.workspace-compare .panel-head h2 {
+  font-size: 16px;
+}
+
+.compare-chart-panel {
+  align-content: start;
+  justify-items: center;
+  min-height: 0;
+  padding-top: 6px;
+}
+
+.workspace-compare .radar {
+  width: min(100%, 430px);
+  max-height: 430px;
+}
+
+.workspace-compare .stat-panel {
+  align-self: start;
+}
+
+.workspace-compare .metric-compare {
+  max-height: 430px;
+  overflow: auto;
+  gap: 7px;
+  padding-right: 3px;
+  scrollbar-width: thin;
+}
+
+.workspace-compare .metric-row {
+  gap: 5px;
+  padding: 8px 9px;
+  border-radius: 9px;
+}
+
+.workspace-compare .metric-title strong {
+  font-size: 12px;
+}
+
+.workspace-compare .metric-title span {
+  font-size: 10px;
+}
+
+.workspace-compare .metric-bar-row {
+  grid-template-columns: minmax(92px, .3fr) minmax(120px, 1fr) minmax(62px, max-content);
+  gap: 8px;
+}
+
+.workspace-compare .metric-bar-row span,
+.workspace-compare .metric-bar-row strong,
+.workspace-compare .metric-bar-row strong small {
+  font-size: 11px;
+}
+
+.workspace-compare .metric-track {
+  height: 7px;
+}
+
+.workspace-compare .similarity-panel {
+  margin-top: 0;
+}
+
+.workspace-compare .similarity-panel .lede {
+  margin: 0 0 8px;
+}
+
+.workspace-compare .similarity-panel .table-wrap {
+  max-height: 300px;
+}
 .guide-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -1740,6 +1887,14 @@ tbody tr.selected-row:hover {
     grid-template-columns: 1fr;
   }
 
+  .workspace-compare .selectors {
+    grid-template-columns: repeat(2, minmax(180px, 1fr));
+  }
+
+  .workspace-compare .metric-compare {
+    max-height: none;
+  }
+
   .database-actions {
     flex-wrap: wrap;
   }
@@ -1799,6 +1954,14 @@ tbody tr.selected-row:hover {
   .selectors label,
   .player-card {
     flex: 1 1 100%;
+  }
+
+  .workspace-compare .selectors {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-compare .radar {
+    width: min(100%, 420px);
   }
 
   .stats,
