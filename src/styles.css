@@ -177,7 +177,9 @@ button {
 
 .tabs {
   min-width: 0;
+  margin-block: -3px;
   overflow-x: auto;
+  padding-block: 3px;
   scrollbar-width: thin;
 }
 
@@ -199,9 +201,17 @@ button.ghost,
 .tabs button:hover,
 button.ghost:hover,
 .file-picker:hover {
-  transform: translateY(-1px);
   border-color: rgba(175, 120, 255, .55);
   background: rgba(30, 26, 63, .96);
+}
+
+.tabs button:hover {
+  transform: translateY(-1px);
+}
+
+button.ghost:hover,
+.file-picker:hover {
+  transform: translateY(-1px);
 }
 
 .tabs button.active,
