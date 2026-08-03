@@ -1,6 +1,6 @@
 import { WORKBOOK_MODEL } from "./model.js";
 import { applyLeagueOverrides, resolveLeague } from "./league-overrides.js";
-import { analyzeImport, inferImportRole, parseCsv, rowGetter, templateHeaders } from "./importer.js";
+import { analyzeImport, inferImportRole, parseCsv, rowGetter, safeNumber, templateHeaders } from "./importer.js";
 import {
   allRoleStatColumns,
   percentileForStat,
@@ -21,6 +21,164 @@ const DATABASE_VIEWS_STORAGE_KEY = "moneyball.databaseViews.v1";
 const SQUAD_STORAGE_KEY = "moneyball.squadBaseline.v1";
 const DATABASE_STATUSES = ["New", "Watch", "Scout", "Saved", "Ignore"];
 const DATABASE_PRIORITIES = ["", "A", "B", "C"];
+const GUIDE_BASELINE = { minutes: 1000, rating: 7 };
+const guideMetric = (label, headers, options = {}) => ({ label, headers, ...options });
+const GUIDE_PRESETS = {
+  goalkeeper: {
+    label: "Goalkeeper",
+    role: "GK",
+    summary: "The guide keeps GK screening simple: enough minutes and a 7.0 average rating are the main check, with deeper keeper stats treated as supporting context.",
+    metrics: [
+      guideMetric("Average rating", ["Average Rating", "Rating"]),
+      guideMetric("Save %", ["Save %", "Save Percentage"], { percent: true }),
+      guideMetric("xG prevented/90", ["xGoals Prevented Per 90", "xGP/90"]),
+      guideMetric("Goals allowed/90", ["Goals Allowed Per 90", "Con/90"], { lowerBetter: true }),
+    ],
+  },
+  striker: {
+    label: "Striker",
+    role: "Striker",
+    summary: "The guide wants striker shortlists built around repeatable goal threat rather than reputation.",
+    metrics: [
+      guideMetric("Goals/90", ["Goals Per 90", "Goals Per 90 minutes", "Goals"]),
+      guideMetric("NP xG/90", ["Non Penalty xGoals Per 90", "Expected Goals Per 90", "NP-xG/90"]),
+      guideMetric("Shots on target", ["Shots On Target %", "Shots On Target Percentage"], { percent: true }),
+      guideMetric("xA/90", ["xAssists Per 90", "Expected Assists Per 90", "xA/90"]),
+    ],
+  },
+  targetForward: {
+    label: "Target forward",
+    role: "Striker",
+    summary: "For target forwards, the guide adds aerial production and headed threat to the striker goal profile.",
+    metrics: [
+      guideMetric("Aerial duels won", ["Aerial Duels Won %", "Headers Won %", "Headers Won Percentage"], { percent: true }),
+      guideMetric("Headers/90", ["Headers Won Per 90", "Headers Won per 90"]),
+      guideMetric("Headers on target", ["Headers On Target %", "Headers On Target Percentage"], { percent: true }),
+      guideMetric("Goals/90", ["Goals Per 90", "Goals Per 90 minutes", "Goals"]),
+    ],
+  },
+  deepForward: {
+    label: "Link forward",
+    role: "Striker",
+    summary: "For false-nine or linking forwards, the guide looks for chance creation as well as shooting output.",
+    metrics: [
+      guideMetric("Key passes/90", ["Key Passes Per 90", "Open Play Key Passes Per 90"]),
+      guideMetric("xA/90", ["xAssists Per 90", "Expected Assists Per 90", "xA/90"]),
+      guideMetric("NP xG/90", ["Non Penalty xGoals Per 90", "Expected Goals Per 90", "NP-xG/90"]),
+      guideMetric("Shots on target", ["Shots On Target %", "Shots On Target Percentage"], { percent: true }),
+    ],
+  },
+  creator: {
+    label: "Creator",
+    role: "MID",
+    summary: "The guide treats creators as chance-production profiles first, with ball security as the risk check.",
+    metrics: [
+      guideMetric("xA/90", ["xAssists Per 90", "Expected Assists Per 90", "xA/90"]),
+      guideMetric("Key passes/90", ["Key Passes Per 90", "Open Play Key Passes Per 90"]),
+      guideMetric("Progressive passes/90", ["Progressive Passes Per 90"]),
+      guideMetric("Poss lost/90", ["Possession Lost Per 90", "Possession Lost"], { lowerBetter: true }),
+    ],
+  },
+  attackingMid: {
+    label: "AM / second striker",
+    role: "MID",
+    summary: "For attacking mids and second strikers, the guide wants chance creation plus credible scoring threat.",
+    metrics: [
+      guideMetric("xA/90", ["xAssists Per 90", "Expected Assists Per 90", "xA/90"]),
+      guideMetric("Key passes/90", ["Key Passes Per 90", "Open Play Key Passes Per 90"]),
+      guideMetric("NP xG/90", ["Non Penalty xGoals Per 90", "Expected Goals Per 90", "NP-xG/90"]),
+      guideMetric("Shots on target", ["Shots On Target %", "Shots On Target Percentage"], { percent: true }),
+    ],
+  },
+  defensiveMid: {
+    label: "Defensive midfielder",
+    role: "MID",
+    summary: "The guide's defensive midfield screen is about ball-winning, interceptions and avoiding costly turnovers.",
+    metrics: [
+      guideMetric("Tackles/90", ["Tackles Completed Per 90", "Tackles Won Per 90", "Tackles Won"]),
+      guideMetric("Interceptions/90", ["Interceptions Per 90"]),
+      guideMetric("Poss lost/90", ["Possession Lost Per 90", "Possession Lost"], { lowerBetter: true }),
+      guideMetric("Pressures/90", ["Pressures Completed Per 90", "Pressures Won Per 90", "Pressures"]),
+    ],
+  },
+  deepPlaymaker: {
+    label: "Deep playmaker",
+    role: "MID",
+    summary: "For deep playmakers, the guide asks whether the player can progress play without wasting possession.",
+    metrics: [
+      guideMetric("Pass completion", ["Pass Completion %", "Pass Completion Percentage"], { percent: true }),
+      guideMetric("Progressive passes/90", ["Progressive Passes Per 90"]),
+      guideMetric("Key passes/90", ["Key Passes Per 90", "Open Play Key Passes Per 90"]),
+      guideMetric("Poss lost/90", ["Possession Lost Per 90", "Possession Lost"], { lowerBetter: true }),
+    ],
+  },
+  winger: {
+    label: "Winger",
+    role: "Winger",
+    summary: "The guide checks wide players for supply: xA, key passes, completed crosses and dribble output.",
+    metrics: [
+      guideMetric("xA/90", ["xAssists Per 90", "Expected Assists Per 90", "xA/90"]),
+      guideMetric("Key passes/90", ["Key Passes Per 90", "Open Play Key Passes Per 90"]),
+      guideMetric("Crosses completed/90", ["Open Play Crosses Completed Per 90", "Crosses Completed Per 90"]),
+      guideMetric("Dribbles/90", ["Dribbles Made Per 90", "Dribbles Completed Per 90", "Dribbles Per 90"]),
+    ],
+  },
+  insideForward: {
+    label: "Inside forward",
+    role: "Winger",
+    summary: "Inside forwards need the winger creation profile with an added scoring check.",
+    metrics: [
+      guideMetric("NP xG/90", ["Non Penalty xGoals Per 90", "Expected Goals Per 90", "NP-xG/90"]),
+      guideMetric("Shots on target", ["Shots On Target %", "Shots On Target Percentage"], { percent: true }),
+      guideMetric("xA/90", ["xAssists Per 90", "Expected Assists Per 90", "xA/90"]),
+      guideMetric("Dribbles/90", ["Dribbles Made Per 90", "Dribbles Completed Per 90", "Dribbles Per 90"]),
+    ],
+  },
+  fullback: {
+    label: "Full back / wing back",
+    role: "FB",
+    summary: "The guide uses full backs as role-specific profiles: crossing and key passes for support, defensive output for security.",
+    metrics: [
+      guideMetric("Crosses completed/90", ["Open Play Crosses Completed Per 90", "Crosses Completed Per 90"]),
+      guideMetric("Key passes/90", ["Key Passes Per 90", "Open Play Key Passes Per 90"]),
+      guideMetric("Tackles/90", ["Tackles Completed Per 90", "Tackles Won Per 90", "Tackles Won"]),
+      guideMetric("Interceptions/90", ["Interceptions Per 90"]),
+    ],
+  },
+  attackingWingback: {
+    label: "Attacking wing back",
+    role: "FB",
+    summary: "Attacking wing backs should show crossing, xA and ball-carrying threat before the shortlist gets serious.",
+    metrics: [
+      guideMetric("xA/90", ["xAssists Per 90", "Expected Assists Per 90", "xA/90"]),
+      guideMetric("Crosses completed/90", ["Open Play Crosses Completed Per 90", "Crosses Completed Per 90"]),
+      guideMetric("Cross completion", ["Open Play Cross Completion %", "Open Play Cross Completion Percentage"], { percent: true }),
+      guideMetric("Dribbles/90", ["Dribbles Made Per 90", "Dribbles Completed Per 90", "Dribbles Per 90"]),
+    ],
+  },
+  centreBack: {
+    label: "Centre back",
+    role: "CB",
+    summary: "The guide keeps centre-back scouting grounded in defensive actions, then adds passing or aerial checks depending on type.",
+    metrics: [
+      guideMetric("Tackles/90", ["Tackles Completed Per 90", "Tackles Won Per 90", "Tackles Won"]),
+      guideMetric("Interceptions/90", ["Interceptions Per 90"]),
+      guideMetric("Aerial duels won", ["Aerial Duels Won %", "Headers Won %", "Headers Won Percentage"], { percent: true }),
+      guideMetric("Clearances/90", ["Clearances Per 90"]),
+    ],
+  },
+  ballPlayingDefender: {
+    label: "Ball-playing defender",
+    role: "CB",
+    summary: "Ball-playing defenders need the defensive base with evidence they can pass and progress play.",
+    metrics: [
+      guideMetric("Pass completion", ["Pass Completion %", "Pass Completion Percentage"], { percent: true }),
+      guideMetric("Progressive passes/90", ["Progressive Passes Per 90"]),
+      guideMetric("Tackles/90", ["Tackles Completed Per 90", "Tackles Won Per 90", "Tackles Won"]),
+      guideMetric("Interceptions/90", ["Interceptions Per 90"]),
+    ],
+  },
+};
 let initialStorageWarning = "";
 
 const model = applyLeagueOverrides(WORKBOOK_MODEL);
@@ -897,6 +1055,110 @@ function rolesWithRows() {
   return roles.filter((role) => roleIds.has(role.id));
 }
 
+function guidePresetForPlayer(player) {
+  if (!player) return GUIDE_PRESETS.striker;
+  const text = [player.role, player.bestRole, player.archetype].join(" ").toLowerCase();
+  if (player.role === "GK") return GUIDE_PRESETS.goalkeeper;
+  if (player.role === "CB") return text.includes("ball") || text.includes("progress") ? GUIDE_PRESETS.ballPlayingDefender : GUIDE_PRESETS.centreBack;
+  if (player.role === "FB") return text.includes("attack") || text.includes("creative") || text.includes("marauder") || text.includes("crossing") ? GUIDE_PRESETS.attackingWingback : GUIDE_PRESETS.fullback;
+  if (player.role === "Winger") return text.includes("inside") || text.includes("goalscorer") || text.includes("if") ? GUIDE_PRESETS.insideForward : GUIDE_PRESETS.winger;
+  if (player.role === "Striker") {
+    if (text.includes("target") || text.includes("aerial")) return GUIDE_PRESETS.targetForward;
+    if (text.includes("false") || text.includes("creator") || text.includes("link") || text.includes("f9")) return GUIDE_PRESETS.deepForward;
+    return GUIDE_PRESETS.striker;
+  }
+  if (player.role === "MID") {
+    if (text.includes("defensive") || text.includes("destroyer") || text.includes("anchor") || text.includes("winner")) return GUIDE_PRESETS.defensiveMid;
+    if (text.includes("regista") || text.includes("playmaker") || text.includes("deep")) return GUIDE_PRESETS.deepPlaymaker;
+    if (text.includes("shadow") || text.includes("attacking") || text.includes("second") || text.includes("10")) return GUIDE_PRESETS.attackingMid;
+    return GUIDE_PRESETS.creator;
+  }
+  return GUIDE_PRESETS.striker;
+}
+
+function guideMetricValue(player, metric) {
+  if (!player) return null;
+  const get = rowGetter(player.source);
+  for (const header of metric.headers) {
+    const raw = safeNumber(get(header));
+    if (!Number.isFinite(raw)) continue;
+    return metric.percent && raw > 1.5 ? raw / 100 : raw;
+  }
+  return null;
+}
+
+function guideMetricRows(player, preset) {
+  return preset.metrics.map((metric) => {
+    const value = guideMetricValue(player, metric);
+    return { ...metric, value, matched: Number.isFinite(value) };
+  });
+}
+
+function formatGuideMetric(row) {
+  if (!Number.isFinite(row.value)) return "Missing";
+  if (row.percent) return `${fmt(row.value * 100)}%`;
+  return fmt(row.value);
+}
+
+function guideBaseline(player) {
+  const rating = guideMetricValue(player, { headers: ["Average Rating", "Rating"] });
+  return {
+    minutes: player?.minutes ?? null,
+    rating,
+    minutesPass: Number.isFinite(player?.minutes) && player.minutes >= GUIDE_BASELINE.minutes,
+    ratingPass: Number.isFinite(rating) && rating >= GUIDE_BASELINE.rating,
+  };
+}
+
+function guideCall(player, baseline, coverage) {
+  if (!player) return { label: "No player", tone: "warn" };
+  if (!baseline.minutesPass) return { label: "Needs minutes", tone: "warn" };
+  if (!Number.isFinite(baseline.rating)) return { label: "Rating missing", tone: "warn" };
+  if (!baseline.ratingPass) return { label: "Below guide rating", tone: "warn" };
+  if (player.role === "GK") return { label: "Guide-ready", tone: "good" };
+  if (coverage >= 0.75) return { label: "Guide-ready", tone: "good" };
+  if (coverage >= 0.5) return { label: "Partial guide fit", tone: "warn" };
+  return { label: "Thin guide data", tone: "bad" };
+}
+
+function guideCheck(label, value, target, pass) {
+  return `<article class="guide-check ${pass ? "is-good" : "is-warn"}">
+    <span>${escapeHtml(label)}</span>
+    <strong>${escapeHtml(value)}</strong>
+    <small>${escapeHtml(target)}</small>
+  </article>`;
+}
+
+function databaseGuideLensPanel(player) {
+  if (!player) return `<section class="panel guide-lens-panel"><div class="empty">Import players to see guide checks.</div></section>`;
+  const preset = guidePresetForPlayer(player);
+  const baseline = guideBaseline(player);
+  const rows = guideMetricRows(player, preset);
+  const matched = rows.filter((row) => row.matched).length;
+  const coverage = rows.length ? matched / rows.length : 0;
+  const call = guideCall(player, baseline, coverage);
+  const minuteValue = Number.isFinite(baseline.minutes) ? fmt(baseline.minutes) : "Missing";
+  const ratingValue = Number.isFinite(baseline.rating) ? fmt(baseline.rating) : "Missing";
+  return `<section class="panel guide-lens-panel">
+    <div class="panel-head">
+      <div><span>Guide lens</span><h2>${escapeHtml(preset.label)}</h2></div>
+      <strong class="guide-call ${escapeHtml(call.tone)}">${escapeHtml(call.label)}</strong>
+    </div>
+    <section class="guide-check-grid">
+      ${guideCheck("Minutes", minuteValue, `${GUIDE_BASELINE.minutes.toLocaleString("en-GB")}+`, baseline.minutesPass)}
+      ${guideCheck("Avg rating", ratingValue, `${fmt(GUIDE_BASELINE.rating)}+`, baseline.ratingPass)}
+      ${guideCheck("Guide metrics", `${matched}/${rows.length}`, "matched", coverage >= 0.5)}
+    </section>
+    <ul class="guide-metric-list">
+      ${rows.map((row) => `<li class="guide-metric ${row.matched ? "" : "is-missing"}">
+        <span>${escapeHtml(row.label)}${row.lowerBetter ? " <small>lower better</small>" : ""}</span>
+        <strong>${escapeHtml(formatGuideMetric(row))}</strong>
+      </li>`).join("")}
+    </ul>
+    <p class="lede guide-note">${escapeHtml(preset.summary)}</p>
+  </section>`;
+}
+
 function databaseScoreAuditRows(player) {
   if (!player) return [];
   const role = roleById(roles, player.role);
@@ -979,7 +1241,10 @@ function renderPlayerDatabase() {
 
   renderShell(`
     ${databaseCompactSummary(basePlayers, databasePlayers)}
-    ${databaseScoreAuditPanel(selectedAudit)}
+    <section class="recruitment-insight-grid">
+      ${databaseScoreAuditPanel(selectedAudit)}
+      ${databaseGuideLensPanel(selectedAudit)}
+    </section>
     <section class="panel database-panel compact-database-panel">
       <div class="panel-head">
         <div><span>Workbook recruitment</span><h2>Recruitment Board</h2></div>
