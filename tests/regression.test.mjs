@@ -4,6 +4,7 @@ import { WORKBOOK_MODEL } from "../src/model.js";
 import { applyLeagueOverrides, resolveLeague } from "../src/league-overrides.js";
 import { analyzeImport, inferImportRole, parseCsv } from "../src/importer.js";
 import { controlProfileForRow, recalcRows } from "../src/scoring.js";
+import { parseFmScreenshotText, screenshotDraftToRow } from "../src/screenshot-importer.js";
 
 const MODEL = applyLeagueOverrides(WORKBOOK_MODEL);
 
@@ -142,6 +143,38 @@ const controlProfile = controlProfileForRow({
 }, controlRole);
 assert.ok(Number.isFinite(controlProfile.controlRaw), "Control Score raw calculation should be finite when inputs are present");
 assert.equal(round1(controlProfile.controlCoverage * 100), 100, "Control Score should report full coverage when all inputs are present");
+
+const screenshotText = `Bundesliga 2
+Goals 3
+Expected Goals 2.15
+Expected Goals/90 mins 0.23
+Assists 2
+Expected Assists 2.35
+Expected Assists/90 Mins 0.25
+Chances Created 4
+Goal Attempts 12
+Shots on Target/90 mins 0.65
+Key Passes 10
+Progressive Passes/90 mins 2.48
+Minutes on Pitch Per Goal 278.67
+Minutes on Pitch Per Assist 418.00
+Pass Completion Percentage 92
+Interceptions 4
+Bundesliga 2 10 3 2 2.2 2.3 1 2 0 0 92% 6.91`;
+const screenshotDraft = parseFmScreenshotText(screenshotText, {
+  "Player Name": "Tobias Oelschlagel",
+  "Age": "21",
+  "Best Position": "Midfielder/Attacking Midfielder (Centre)",
+});
+const screenshotRow = screenshotDraftToRow(screenshotDraft);
+assert.equal(screenshotDraft.meta.Division, "Bundesliga 2", "screenshot parser should keep numbered division names");
+assert.equal(screenshotRow.Mins, "841", "screenshot parser should estimate minutes from totals and per-90s");
+assert.equal(screenshotRow["Average Rating"], "6.91", "screenshot parser should read average rating from selected competition row");
+assert.equal(screenshotRow["Pass Completion %"], "0.92", "screenshot parser should normalize percentage stats to workbook scale");
+assert.equal(screenshotRow["Shots On Target %"], "0.51", "screenshot parser should derive shot accuracy when only SOT per-90 is shown");
+const screenshotImportRole = inferImportRole([screenshotRow], MODEL.roles);
+const screenshotPlayers = recalcRows({ rows: [screenshotRow], roles: MODEL.roles, importRole: screenshotImportRole.id, importRoleLocked: screenshotImportRole.locked });
+assert.ok(screenshotPlayers.length > 0, "screenshot row should produce scored role entries");
 console.log(`Regression checks passed for ${Object.keys(EXPORTS).length - skipped.length} available exports${skipped.length ? `; skipped missing fixtures: ${skipped.join(", ")}` : ""}.`);
 
 
