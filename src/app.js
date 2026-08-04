@@ -1102,25 +1102,35 @@ function thresholdCanvasForOcr(canvas, threshold = 95) {
   ctx.putImageData(imageData, 0, 0);
 }
 
-async function enhancedStatsCanvas(file) {
+async function enhancedRegionCanvas(file, region) {
   const image = await imageSourceFromFile(file);
   const width = image.width || image.naturalWidth;
   const height = image.height || image.naturalHeight;
-  const cropY = Math.round(height * 0.48);
-  const cropHeight = Math.max(1, height - cropY);
-  const scale = width < 1800 ? 2 : 1.5;
+  const cropX = Math.round(width * (region.left || 0));
+  const cropY = Math.round(height * (region.top || 0));
+  const cropWidth = Math.max(1, Math.round(width * (region.width || 1)));
+  const cropHeight = Math.max(1, Math.round(height * (region.height || 1)));
+  const scale = region.scale || (width < 1800 ? 2 : 1.5);
   const canvas = document.createElement("canvas");
-  canvas.width = Math.round(width * scale);
+  canvas.width = Math.round(cropWidth * scale);
   canvas.height = Math.round(cropHeight * scale);
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   if (!ctx) throw new Error("Screenshot image could not be processed.");
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.filter = "grayscale(1) contrast(1.85) brightness(1.12)";
-  ctx.drawImage(image, 0, cropY, width, cropHeight, 0, 0, canvas.width, canvas.height);
-  thresholdCanvasForOcr(canvas);
+  ctx.drawImage(image, cropX, cropY, cropWidth, cropHeight, 0, 0, canvas.width, canvas.height);
+  thresholdCanvasForOcr(canvas, region.threshold || 95);
   if (typeof image.close === "function") image.close();
   return canvas;
+}
+
+function enhancedPlayerHeaderCanvas(file) {
+  return enhancedRegionCanvas(file, { left: 0.08, top: 0.11, width: 0.62, height: 0.16, scale: 3 });
+}
+
+function enhancedStatsCanvas(file) {
+  return enhancedRegionCanvas(file, { left: 0, top: 0.48, width: 1, height: 0.52 });
 }
 
 function mergeOcrText(...parts) {
@@ -1162,11 +1172,14 @@ async function runScreenshotOcr(file) {
       },
     });
     const result = await worker.recognize(file);
+    setScreenshotStatus("Reading player header", "enhancing crop");
+    const headerCanvas = await enhancedPlayerHeaderCanvas(file);
+    const headerResult = await worker.recognize(headerCanvas);
     setScreenshotStatus("Reading stat panel", "enhancing crop");
     const statCanvas = await enhancedStatsCanvas(file);
     const statResult = await worker.recognize(statCanvas);
     await worker.terminate();
-    state.screenshotOcrText = mergeOcrText(result?.data?.text, statResult?.data?.text);
+    state.screenshotOcrText = mergeOcrText(result?.data?.text, headerResult?.data?.text, statResult?.data?.text);
     state.screenshotDraft = parseFmScreenshotText(state.screenshotOcrText, screenshotMetaFromInputs());
     setScreenshotStatus("OCR complete", "Review before import");
   } catch (error) {

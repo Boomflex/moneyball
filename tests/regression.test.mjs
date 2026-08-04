@@ -204,6 +204,7 @@ Regular Starter
 Attacking Midfielder (Left)
 GER 19 years old (7/4/2047)`;
 const playerClubHeaderDraft = parseFmScreenshotText(playerClubHeaderText);
+assert.equal(playerClubHeaderDraft.meta["Player Name"], "Jenath Jurgeleit", "screenshot parser should take player name from the player-card ID line");
 assert.equal(playerClubHeaderDraft.meta.Club, "1. FC Koln", "screenshot parser should take club from the player-card club box");
 assert.equal(playerClubHeaderDraft.meta.Division, "", "screenshot parser should ignore current-team breadcrumb competitions");
 
@@ -212,6 +213,20 @@ Bundesliga 9 1 5 2.1 6.5 0 3 1 0 81% 7.33`;
 const playerClubCompetitionDraft = parseFmScreenshotText(playerClubCompetitionText);
 assert.equal(playerClubCompetitionDraft.meta.Club, "1. FC Koln", "screenshot parser should keep the player club when competition stats are present");
 assert.equal(playerClubCompetitionDraft.meta.Division, "Bundesliga", "screenshot parser should take division from the player competition row");
+
+const corruptedReviewText = `${playerClubHeaderText}
+QO (r) Bundesliga 10 15 28 67 0 :
+UEFA Europa League
+Expected Goals/90 mins 040
+Progressive Passes/90 mins 792
+Shots on Target/90 mins 132`;
+const corruptedReviewDraft = parseFmScreenshotText(corruptedReviewText);
+const corruptedReviewRow = screenshotDraftToRow(corruptedReviewDraft);
+assert.equal(corruptedReviewDraft.meta["Player Name"], "Jenath Jurgeleit", "screenshot parser should extract the player name from the ID header line");
+assert.equal(corruptedReviewDraft.meta.Division, "UEFA Europa League", "screenshot parser should reject corrupted numeric competition fragments");
+assert.equal(corruptedReviewRow["Non Penalty xGoals Per 90"], "0.40", "screenshot parser should repair missing leading decimals in per-90 OCR");
+assert.equal(corruptedReviewRow["Progressive Passes Per 90"], "7.92", "screenshot parser should repair missing stat decimals above one");
+assert.equal(corruptedReviewDraft.stats["Shots On Target Per 90"], "1.32", "screenshot parser should repair missing shot decimal OCR");
 const noisyMergedText = `${noisyHeaderText}
 
 --- Enhanced stat panel OCR ---

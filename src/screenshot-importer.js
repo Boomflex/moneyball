@@ -106,6 +106,32 @@ const NON_COMPETITION_PATTERN = /\b(?:national:|portal|squad|overview|bookmarks|
 const NAV_COMPETITION_PATTERN = /[@#]|\s=\s/;
 const CLUB_STATUS_PATTERN = /\b(?:regular starter|important player|fringe player|star player|squad player|impact sub|emergency backup|breakthrough prospect)\b/i;
 const CLUB_REJECT_PATTERN = /\b(?:attacking|defensive|goalkeeper|midfielder|defender|striker|winger|forward|tactical role|actual playing time|condition|sharpness|caps|goals|years old|national|last club|last transfer|portal|overview|player report|team selection|squad|recruitment|match day|training|youth setup)\b/i;
+const PER_90_DECIMAL_REPAIR_FIELDS = new Set([
+  "Goals Per 90",
+  "Non Penalty xGoals Per 90",
+  "Assists Per 90",
+  "xAssists Per 90",
+  "Chances Created Per 90",
+  "Open Play Key Passes Per 90",
+  "Progressive Passes Per 90",
+  "Shots Per 90",
+  "Shots On Target Per 90",
+  "Passes Completed Per 90",
+  "Open Play Crosses Completed Per 90",
+  "Dribbles Made Per 90",
+  "Possession Won Per 90",
+  "Possession Lost Per 90",
+  "Tackles Completed Per 90",
+  "Headers Won Per 90",
+  "Interceptions Per 90",
+  "Blocks Per 90",
+  "Fouls Made Per 90",
+  "Mistakes Per 90",
+  "xGoals Prevented Per 90",
+  "Goals Allowed Per 90",
+  "Saves Per 90",
+]);
+
 const INLINE_STAT_PATTERNS = [
   [/\bExpected Goals\/\s*90\s*(?:mins?)?\s+(-?\d+(?:\.\d+)?)/i, "Non Penalty xGoals Per 90"],
   [/\bExpected Goals\s+(-?\d+(?:\.\d+)?)/i, "Expected Goals"],
@@ -179,9 +205,17 @@ function cleanCompetitionName(line) {
     .trim();
 }
 
+function numberTokenCount(line) {
+  return (line.match(/\b\d+(?:\.\d+)?\b/g) || []).length;
+}
+
 function isCompetitionLine(line) {
   const clean = cleanCompetitionName(line);
-  return Boolean(clean) && COMPETITION_PATTERN.test(clean) && !NON_COMPETITION_PATTERN.test(clean) && !NAV_COMPETITION_PATTERN.test(line);
+  return Boolean(clean)
+    && COMPETITION_PATTERN.test(clean)
+    && !NON_COMPETITION_PATTERN.test(clean)
+    && !NAV_COMPETITION_PATTERN.test(line)
+    && numberTokenCount(clean) <= 1;
 }
 
 function cleanClubCandidate(line) {
@@ -236,6 +270,36 @@ function extractClub(lines) {
   return "";
 }
 
+function cleanPlayerNameCandidate(line) {
+  return cleanOcrLine(line)
+    .replace(/^[^A-Za-z0-9\u00c0-\u024f]+/, "")
+    .replace(/\s+\d{1,3}$/, "")
+    .replace(/\s+\b[a-z]{1,3}\b$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isLikelyPlayerName(line) {
+  const clean = cleanPlayerNameCandidate(line);
+  if (clean.length < 5 || clean.length > 40) return false;
+  if (/\b(?:portal|squad|overview|team selection|player report|training|recruitment|match day|national|regular starter|important player)\b/i.test(clean)) return false;
+  if (/[@#\u00a3\u20ac]|\bp\/w\b/i.test(clean)) return false;
+  const words = clean.split(/\s+/);
+  if (words.length < 2 || words.length > 4) return false;
+  return words.every((word) => /^(?:[A-Z\u00c0-\u00de][A-Za-z\u00c0-\u024f'.-]+)$/.test(word));
+}
+
+function extractPlayerName(lines) {
+  for (const line of lines.slice(0, 16)) {
+    const clean = cleanOcrLine(line);
+    const match = clean.match(/^(.+?)\s+(?:\d{1,3}\s+)?\(?\s*(?:ID[:\s-]*)?\d{8,}\)?/i);
+    if (!match) continue;
+    const candidate = cleanPlayerNameCandidate(match[1]);
+    if (isLikelyPlayerName(candidate)) return candidate;
+  }
+  return "";
+}
+
 function extractPosition(line) {
   const clean = cleanOcrLine(line);
   const match = clean.match(/\b(?:(?:Defensive|Attacking)\s+)?(?:Goalkeeper|Defender|Midfielder|Winger|Striker|Forward)(?:\/(?:Defensive|Attacking)?\s*(?:Defender|Midfielder|Winger|Striker|Forward))*\s*(?:\([^)]+\))?/i);
@@ -258,9 +322,18 @@ function canonicalStat(label) {
   return STAT_ALIASES.get(key) || null;
 }
 
+function repairOcrDecimal(target, value) {
+  const text = String(value).trim();
+  if (!PER_90_DECIMAL_REPAIR_FIELDS.has(target)) return text;
+  if (!/^\d{3,4}$/.test(text)) return text;
+  const whole = text.slice(0, -2) || "0";
+  const decimal = text.slice(-2);
+  return `${Number(whole)}.${decimal}`;
+}
+
 function setDetected(draft, target, value, source) {
   if (value === null || value === undefined || value === "") return;
-  const text = String(value).trim();
+  const text = repairOcrDecimal(target, value);
   if (!text) return;
   if (!draft.stats[target]) draft.stats[target] = text;
   draft.detected.push({ target, value: text, source });
@@ -298,6 +371,9 @@ function inferMetaFromText(draft, lines) {
 
   const values = [...joined.matchAll(/\u00a3\s?\d+(?:\.\d+)?\s?[KMB](?!\s*p\/w)/gi)].map((match) => match[0]);
   if (values[0]) draft.meta["Actual Value (\u00a3)"] = values[0];
+
+  const playerName = extractPlayerName(lines);
+  if (playerName) draft.meta["Player Name"] = playerName;
 
   const club = extractClub(lines);
   if (club) draft.meta.Club = club;
@@ -377,7 +453,7 @@ export function parseFmScreenshotText(text, manualMeta = {}) {
   for (const line of lines) {
     const row = tableRowFromLine(line);
     if (row) {
-      draft.meta.Division = row.competition || draft.meta.Division;
+      if (!draft.meta.Division) draft.meta.Division = row.competition || draft.meta.Division;
       setDetected(draft, "Goals", row.goals, line);
       setDetected(draft, "Assists", row.assists, line);
       setDetected(draft, "Expected Goals", row.xg, line);
@@ -400,7 +476,7 @@ export function parseFmScreenshotText(text, manualMeta = {}) {
     const target = canonicalStat(pair.label);
     if (target) setDetected(draft, target, pair.value, line);
     if (!draft.meta.Division && isCompetitionLine(pair.label)) {
-      draft.meta.Division = cleanCompetitionName(pair.label);
+      draft.meta.Division = cleanCompetitionName(line);
     }
   }
   deriveRates(draft);
