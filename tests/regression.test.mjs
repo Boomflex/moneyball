@@ -193,6 +193,25 @@ assert.equal(noisyHeaderDraft.meta["Actual Value (\u00a3)"], "", "screenshot par
 assert.equal(noisyHeaderDraft.meta.Division, "", "screenshot parser should not treat national status or navigation as a division");
 assert.equal(noisyHeaderDraft.meta.Club, "", "screenshot parser should not infer club from noisy role-header fragments");
 
+
+const playerClubHeaderText = `60 FPS
+Team Selection
+@ Eintracht Frankfurt = #3 Bundesliga
+Team Selection > Player Report
+Jenath Jurgeleit 35 (ID: 2003706754)
+1. FC Koln
+Regular Starter
+Attacking Midfielder (Left)
+GER 19 years old (7/4/2047)`;
+const playerClubHeaderDraft = parseFmScreenshotText(playerClubHeaderText);
+assert.equal(playerClubHeaderDraft.meta.Club, "1. FC Koln", "screenshot parser should take club from the player-card club box");
+assert.equal(playerClubHeaderDraft.meta.Division, "", "screenshot parser should ignore current-team breadcrumb competitions");
+
+const playerClubCompetitionText = `${playerClubHeaderText}
+Bundesliga 9 1 5 2.1 6.5 0 3 1 0 81% 7.33`;
+const playerClubCompetitionDraft = parseFmScreenshotText(playerClubCompetitionText);
+assert.equal(playerClubCompetitionDraft.meta.Club, "1. FC Koln", "screenshot parser should keep the player club when competition stats are present");
+assert.equal(playerClubCompetitionDraft.meta.Division, "Bundesliga", "screenshot parser should take division from the player competition row");
 const noisyMergedText = `${noisyHeaderText}
 
 --- Enhanced stat panel OCR ---

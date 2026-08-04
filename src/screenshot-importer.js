@@ -102,7 +102,10 @@ const STAT_ALIASES = new Map([
 
 const META_LABELS = new Set(["attacking", "passescompleted", "defensive", "goalkeeper", "competition", "apps", "goals", "assists", "xg", "xa", "pens", "pom", "yel", "red", "pas", "avgrat"]);
 const COMPETITION_PATTERN = /\b(?:bundesliga|league|division|liga|serie|premier|championship|eredivisie|jupiler|national league)\b/i;
-const NON_COMPETITION_PATTERN = /\b(?:national:|portal|squad|overview|bookmarks|tactical role|condition|caps|messages|player report|first team|under19s|training|youth setup)\b/i;
+const NON_COMPETITION_PATTERN = /\b(?:national:|portal|squad|overview|bookmarks|tactical role|condition|caps|messages|player report|first team|under19s|training|youth setup|team selection)\b/i;
+const NAV_COMPETITION_PATTERN = /[@#]|\s=\s/;
+const CLUB_STATUS_PATTERN = /\b(?:regular starter|important player|fringe player|star player|squad player|impact sub|emergency backup|breakthrough prospect)\b/i;
+const CLUB_REJECT_PATTERN = /\b(?:attacking|defensive|goalkeeper|midfielder|defender|striker|winger|forward|tactical role|actual playing time|condition|sharpness|caps|goals|years old|national|last club|last transfer|portal|overview|player report|team selection|squad|recruitment|match day|training|youth setup)\b/i;
 const INLINE_STAT_PATTERNS = [
   [/\bExpected Goals\/\s*90\s*(?:mins?)?\s+(-?\d+(?:\.\d+)?)/i, "Non Penalty xGoals Per 90"],
   [/\bExpected Goals\s+(-?\d+(?:\.\d+)?)/i, "Expected Goals"],
@@ -169,8 +172,68 @@ function cleanOcrLine(line) {
     .trim();
 }
 
+function cleanCompetitionName(line) {
+  return cleanOcrLine(line)
+    .replace(/^[^A-Za-z0-9\u00c0-\u024f]+/, "")
+    .replace(/^#\s*/, "")
+    .trim();
+}
+
 function isCompetitionLine(line) {
-  return COMPETITION_PATTERN.test(line) && !NON_COMPETITION_PATTERN.test(line);
+  const clean = cleanCompetitionName(line);
+  return Boolean(clean) && COMPETITION_PATTERN.test(clean) && !NON_COMPETITION_PATTERN.test(clean) && !NAV_COMPETITION_PATTERN.test(line);
+}
+
+function cleanClubCandidate(line) {
+  return cleanOcrLine(line)
+    .replace(/^[^A-Za-z0-9\u00c0-\u024f]+/, "")
+    .replace(CLUB_STATUS_PATTERN, "")
+    .replace(/\b(?:EU National|Last Club|Last Transfer Value|Actual Playing Time|Tactical Role|Condition|Sharpness|Nationality)\b.*$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isLikelyClubName(line) {
+  const clean = cleanClubCandidate(line);
+  if (clean.length < 3 || clean.length > 42) return false;
+  if (!/[A-Za-z\u00c0-\u024f]/.test(clean)) return false;
+  if (/[#@\u00a3\u20ac]|\b\d{2,}\b|\bp\/w\b|\bID\b/i.test(clean)) return false;
+  if (COMPETITION_PATTERN.test(clean) || CLUB_REJECT_PATTERN.test(clean)) return false;
+  if (!/^(?:\d+\.\s*)?[A-Z\u00c0-\u00de]/.test(clean)) return false;
+  return clean.split(/\s+/).length <= 6;
+}
+
+function clubCandidateFromLine(line) {
+  const clean = cleanOcrLine(line);
+  const candidates = [];
+  const afterId = clean.match(/\bID[:\s-]*\d+\)?\s+(.+)/i)?.[1];
+  if (afterId) candidates.push(afterId);
+  if (CLUB_STATUS_PATTERN.test(clean)) {
+    candidates.push(clean.split(CLUB_STATUS_PATTERN)[0]);
+  } else {
+    candidates.push(clean);
+  }
+  return candidates.map(cleanClubCandidate).find(isLikelyClubName) || "";
+}
+
+function extractClub(lines) {
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (!CLUB_STATUS_PATTERN.test(line)) continue;
+    const sameLine = clubCandidateFromLine(line);
+    if (sameLine) return sameLine;
+    for (let nearby = index - 1; nearby >= Math.max(0, index - 4); nearby -= 1) {
+      const candidate = clubCandidateFromLine(lines[nearby]);
+      if (candidate) return candidate;
+    }
+  }
+  for (const line of lines.slice(0, 12)) {
+    const afterId = cleanOcrLine(line).match(/\bID[:\s-]*\d+\)?\s+(.+)/i)?.[1];
+    if (!afterId) continue;
+    const candidate = cleanClubCandidate(afterId);
+    if (isLikelyClubName(candidate)) return candidate;
+  }
+  return "";
 }
 
 function extractPosition(line) {
@@ -214,7 +277,7 @@ function tableRowFromLine(line) {
   const match = line.trim().match(/^(.+?)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)%\s+(\d+(?:\.\d+)?)$/i);
   if (!match) return null;
   return {
-    competition: match[1].replace(/^[^A-Za-z0-9]+\s+/, "").trim(),
+    competition: cleanCompetitionName(match[1]),
     apps: match[2],
     goals: match[3],
     assists: match[4],
@@ -235,6 +298,9 @@ function inferMetaFromText(draft, lines) {
 
   const values = [...joined.matchAll(/\u00a3\s?\d+(?:\.\d+)?\s?[KMB](?!\s*p\/w)/gi)].map((match) => match[0]);
   if (values[0]) draft.meta["Actual Value (\u00a3)"] = values[0];
+
+  const club = extractClub(lines);
+  if (club) draft.meta.Club = club;
 
   const position = lines.map(extractPosition).find(Boolean);
   if (position) draft.meta["Best Position"] = position;
@@ -326,7 +392,7 @@ export function parseFmScreenshotText(text, manualMeta = {}) {
     if (!pair) {
       const maybeDivision = normalise(line);
       if (!draft.meta.Division && maybeDivision && !META_LABELS.has(maybeDivision) && isCompetitionLine(line)) {
-        draft.meta.Division = line;
+        draft.meta.Division = cleanCompetitionName(line);
       }
       continue;
     }
@@ -334,7 +400,7 @@ export function parseFmScreenshotText(text, manualMeta = {}) {
     const target = canonicalStat(pair.label);
     if (target) setDetected(draft, target, pair.value, line);
     if (!draft.meta.Division && isCompetitionLine(pair.label)) {
-      draft.meta.Division = pair.label;
+      draft.meta.Division = cleanCompetitionName(pair.label);
     }
   }
   deriveRates(draft);
