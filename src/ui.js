@@ -44,8 +44,8 @@ export function flagClass(value) {
 }
 
 export function upgradeClass(value) {
-  if (value === "Clear upgrade" || value === "Possible upgrade" || value === "Squad gap") return "flag good";
-  if (value === "Depth only") return "flag bad";
+  if (["At benchmark", "Strong benchmark closer", "Benchmark closer", "Clear upgrade", "Possible upgrade", "Squad gap"].includes(value)) return "flag good";
+  if (["Below benchmark", "No closer", "Depth only"].includes(value)) return "flag bad";
   return "flag";
 }
 export function labelFor(col) {
@@ -72,15 +72,21 @@ export function labelFor(col) {
     scoutCount: "Scout",
     watchCount: "Watch",
     greatValueCount: "Value flags",
-    squadCount: "Squad",
-    squadBest: "Squad best",
-    squadBestScore: "Squad score",
+    squadCount: "Your roles",
+    squadBest: "Your best",
+    squadBestScore: "Your score",
+    benchmarkCount: "Benchmark roles",
+    benchmarkBest: "Benchmark best",
+    benchmarkScore: "Benchmark score",
+    benchmarkPlayer: "Benchmark player",
+    benchmarkGap: "Your vs benchmark",
     topCandidate: "Top candidate",
-    squadPlayer: "Squad player",
-    squadScore: "Squad score",
+    squadPlayer: "Your player",
+    squadScore: "Your score",
     candidate: "Candidate",
     candidateScore: "Candidate score",
-    scoreGap: "Score gap",
+    scoreGap: "Candidate vs yours",
+    candidateBenchmarkGap: "Candidate vs benchmark",
     candidateDivision: "Division",
     candidateValue: "Value",
     upgradeCall: "Upgrade call",
@@ -116,7 +122,7 @@ export function formatCell(row, col) {
   if (col === "notes") return notesCell(row, value);
   if (col.startsWith("stat:")) return formatStatCell(value);
   if (["actualValue", "expectedValue", "actualWage", "expectedWage", "candidateValue"].includes(col)) return value ? money.format(value) : "";
-  if (["bestScore", "controlScore", "totalVfm", "valueRatio", "wageRatio", "strength", "squadBestScore", "squadScore", "candidateScore", "scoreGap", "avgScore"].includes(col)) return value === null || value === undefined ? "" : fmt(value);
+  if (["bestScore", "controlScore", "totalVfm", "valueRatio", "wageRatio", "strength", "squadBestScore", "squadScore", "benchmarkScore", "candidateScore", "scoreGap", "benchmarkGap", "candidateBenchmarkGap", "avgScore"].includes(col)) return value === null || value === undefined ? "" : fmt(value);
   if (col === "controlCoverage") return Number.isFinite(value) ? `${fmt(value * 100)}%` : "";
   if (["player", "dealFlag", "archetype", "upgradeCall"].includes(col)) return `<span class="${col === "dealFlag" ? flagClass(value) : col === "upgradeCall" ? upgradeClass(value) : ""}">${escapeHtml(value ?? "")}</span>`;
   return escapeHtml(value ?? "");

@@ -1901,21 +1901,23 @@ tbody tr.selected-row:hover {
 
 .squad-baseline-grid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   align-items: start;
 }
 
 .squad-baseline-strip {
   min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 2px 2px 6px;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(9, 13, 29, .9);
 }
 
 .squad-baseline-strip .panel-head {
-  flex: 0 0 auto;
   margin: 0;
 }
 
@@ -1925,27 +1927,26 @@ tbody tr.selected-row:hover {
 
 .squad-summary {
   min-width: 0;
-  flex: 1 1 auto;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 14px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
   margin: 0;
 }
 
 .squad-summary article {
   min-width: 0;
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  padding: 0;
-  border: 0;
-  background: transparent;
+  display: grid;
+  gap: 3px;
+  padding: 8px 9px;
+  border: 1px solid rgba(210, 200, 245, .1);
+  border-radius: 10px;
+  background: rgba(7, 10, 24, .48);
 }
 
 .squad-summary span {
-  display: inline;
+  display: block;
   color: var(--accent);
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 900;
   letter-spacing: .08em;
   text-transform: uppercase;
@@ -1953,21 +1954,30 @@ tbody tr.selected-row:hover {
 }
 
 .squad-summary strong {
-  display: inline;
+  display: block;
   overflow: hidden;
   color: var(--ink);
-  font-size: 15px;
+  font-size: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .squad-upload-actions {
-  flex: 0 0 auto;
+  flex-wrap: wrap;
   margin: 0;
 }
 
+.squad-baseline-strip .lede {
+  margin: 0;
+  font-size: 12px;
+}
+
+.squad-upgrade-panel {
+  grid-column: 1 / -1;
+}
+
 .upgrade-table {
-  min-width: 1060px;
+  min-width: 1420px;
 }
 
 .upgrade-table th:nth-child(3),
@@ -1997,7 +2007,7 @@ tbody tr.selected-row:hover {
 }
 
 .planner-table {
-  min-width: 1180px;
+  min-width: 1540px;
 }
 
 .planner-table th:nth-child(n+2):nth-child(-n+6),
