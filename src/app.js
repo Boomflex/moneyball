@@ -1020,7 +1020,7 @@ function renderScreenshotImportPanel() {
   const warnings = draft.warnings.length
     ? `<ul class="screenshot-warnings">${draft.warnings.map((warning) => `<li>${escapeHtml(warning)}</li>`).join("")}</ul>`
     : "";
-  return `<section class="panel screenshot-import-panel">
+  return `<section class="panel screenshot-import-panel" id="screenshotImportPanel" tabindex="0">
     <div class="panel-head">
       <div><span>Screenshot import</span><h2>FM Scout Card</h2></div>
       <strong>${confidence.stats} stats detected</strong>
@@ -1030,8 +1030,8 @@ function renderScreenshotImportPanel() {
         <div class="screenshot-dropzone" id="screenshotDropzone" tabindex="0">
           <div class="upload-icon"><span>IMG</span></div>
           <div>
-            <h2>Scout screenshot</h2>
-            <p>OCR runs in your browser, then the detected row can be reviewed before import.</p>
+            <h2>Paste scout screenshot</h2>
+            <p>Copy the FM screen, click this panel, then paste. You can still browse or drop an image.</p>
           </div>
           <input class="sr-only" id="screenshotFileInput" type="file" accept="image/*" />
           <label class="file-picker" for="screenshotFileInput">Browse image</label>
@@ -1152,10 +1152,29 @@ function importScreenshotDraft({ append = false } = {}) {
   setRows(append && state.rows.length ? [...state.rows, row] : [row]);
 }
 
+function imageFileFromPaste(event) {
+  return [...(event.clipboardData?.items || [])]
+    .find((entry) => entry.type.startsWith("image/"))
+    ?.getAsFile() || null;
+}
+
+function handleScreenshotPaste(event) {
+  const file = imageFileFromPaste(event);
+  if (!file) return;
+  event.preventDefault();
+  handleScreenshotFile(file);
+}
+
 function bindScreenshotImport() {
   const input = app.querySelector("#screenshotFileInput");
+  const panel = app.querySelector("#screenshotImportPanel");
   const dropzone = app.querySelector("#screenshotDropzone");
   input?.addEventListener("change", () => handleScreenshotFile(input.files[0]));
+  panel?.addEventListener("paste", handleScreenshotPaste);
+  panel?.addEventListener("click", (event) => {
+    if (!event.target.closest("button, input, label, select, textarea")) panel.focus();
+  });
+  dropzone?.addEventListener("click", () => dropzone.focus());
   dropzone?.addEventListener("dragover", (event) => { event.preventDefault(); dropzone.classList.add("dragging"); });
   dropzone?.addEventListener("dragleave", () => dropzone.classList.remove("dragging"));
   dropzone?.addEventListener("drop", (event) => {
@@ -1163,10 +1182,7 @@ function bindScreenshotImport() {
     dropzone.classList.remove("dragging");
     handleScreenshotFile([...event.dataTransfer.files].find((file) => file.type.startsWith("image/")));
   });
-  dropzone?.addEventListener("paste", (event) => {
-    const item = [...event.clipboardData.items].find((entry) => entry.type.startsWith("image/"));
-    if (item) handleScreenshotFile(item.getAsFile());
-  });
+  dropzone?.addEventListener("paste", handleScreenshotPaste);
   app.querySelector("#parseScreenshotText")?.addEventListener("click", parseScreenshotTextFromReview);
   app.querySelector("#clearScreenshotImport")?.addEventListener("click", clearScreenshotImport);
   app.querySelector("#importScreenshotReplace")?.addEventListener("click", () => importScreenshotDraft({ append: false }));
