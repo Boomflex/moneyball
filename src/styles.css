@@ -1967,6 +1967,21 @@ tbody tr.selected-row:hover {
   margin: 0;
 }
 
+.squad-division-control {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.squad-division-control select {
+  width: 100%;
+  min-width: 0;
+}
+
 .squad-baseline-strip .lede {
   margin: 0;
   font-size: 12px;

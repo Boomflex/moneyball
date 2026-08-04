@@ -1,6 +1,15 @@
 import { WORKBOOK_MODEL } from "./model.js";
 import { applyLeagueOverrides, resolveLeague } from "./league-overrides.js";
-import { analyzeImport, inferImportRole, parseCsv, rowGetter, safeNumber, templateHeaders } from "./importer.js";
+import {
+  analyzeImport,
+  applySquadDivisionOverride,
+  dominantDivisionForRows,
+  inferImportRole,
+  parseCsv,
+  rowGetter,
+  safeNumber,
+  templateHeaders,
+} from "./importer.js";
 import {
   allRoleStatColumns,
   percentileForStat,
@@ -351,14 +360,20 @@ function saveDatabaseViews() {
 }
 function buildSquadBaseline(rows, metadata = {}) {
   const importRole = inferImportRole(rows, roles);
+  const hasDivisionOverride = Object.prototype.hasOwnProperty.call(metadata, "divisionOverride");
+  const divisionOverride = hasDivisionOverride
+    ? String(metadata.divisionOverride || "").trim()
+    : dominantDivisionForRows(rows);
+  const scoringRows = applySquadDivisionOverride(rows, divisionOverride);
   return {
     name: metadata.name || "Current squad",
     savedAt: metadata.savedAt || new Date().toISOString(),
     rows,
+    divisionOverride,
     importRole: importRole.id,
     importRoleLocked: importRole.locked,
     importReport: analyzeImport(rows, roles, importRole),
-    players: recalcRows({ rows, roles, importRole: importRole.id, importRoleLocked: importRole.locked }),
+    players: recalcRows({ rows: scoringRows, roles, importRole: importRole.id, importRoleLocked: importRole.locked }),
   };
 }
 
@@ -381,8 +396,8 @@ function saveStoredSquad(storageKey, squad, warning) {
       state.storageWarning = "";
       return;
     }
-    const { name, savedAt, rows } = squad;
-    localStorage.setItem(storageKey, JSON.stringify({ name, savedAt, rows }));
+    const { name, savedAt, rows, divisionOverride } = squad;
+    localStorage.setItem(storageKey, JSON.stringify({ name, savedAt, rows, divisionOverride }));
     state.storageWarning = "";
   } catch {
     state.storageWarning = warning;
@@ -1425,9 +1440,24 @@ function bindDatabaseControls(rows, columns) {
   }));
   app.querySelector("#exportDatabase")?.addEventListener("click", () => download("moneyball-recruitment-board.csv", toCsvColumns(rows, columns)));
 }
-function squadSnapshotCard({ squad, label, title, inputId, clearId, clearLabel, uploadLabel, emptyCopy }) {
+function squadDivisionCounts(squad) {
+  const counts = new Map();
+  for (const row of squad?.rows || []) {
+    const division = String(rowGetter(row)("Division") || "").trim();
+    if (!division) continue;
+    counts.set(division, (counts.get(division) || 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+}
+
+function squadSnapshotCard({ squad, label, title, inputId, clearId, divisionSelectId, clearLabel, uploadLabel, emptyCopy }) {
   const rolesCovered = new Set((squad?.players || []).map((item) => item.role)).size;
   const savedDate = squad?.savedAt ? new Date(squad.savedAt).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }) : "Not saved";
+  const divisionCounts = squadDivisionCounts(squad);
+  const divisionOptions = divisionCounts.map(([division, count]) => `<option value="${escapeHtml(division)}" ${squad?.divisionOverride === division ? "selected" : ""}>${escapeHtml(division)} (${count})</option>`).join("");
+  const divisionCopy = squad?.divisionOverride
+    ? `All players are scored as ${squad.divisionOverride}. The export contains ${divisionCounts.length} division label${divisionCounts.length === 1 ? "" : "s"}.`
+    : "Each player is scored using the division in their exported row.";
   return `<section class="squad-baseline-strip">
     <div class="panel-head compact"><div><span>${escapeHtml(label)}</span><h2>${escapeHtml(squad?.name || title)}</h2></div></div>
     <div class="squad-summary">
@@ -1441,7 +1471,14 @@ function squadSnapshotCard({ squad, label, title, inputId, clearId, clearLabel, 
       <label class="file-picker" for="${inputId}">${escapeHtml(uploadLabel)}</label>
       ${squad ? `<button class="ghost" id="${clearId}" type="button">${escapeHtml(clearLabel)}</button>` : ""}
     </div>
-    <p class="lede">${escapeHtml(emptyCopy)}</p>
+    ${squad ? `<label class="squad-division-control" for="${divisionSelectId}">
+      <span>Score all players as</span>
+      <select id="${divisionSelectId}">
+        <option value="" ${squad.divisionOverride ? "" : "selected"}>Each exported division</option>
+        ${divisionOptions}
+      </select>
+    </label>` : ""}
+    <p class="lede">${escapeHtml(squad ? divisionCopy : emptyCopy)}</p>
   </section>`;
 }
 
@@ -1459,6 +1496,7 @@ function renderSquadPlanner() {
         title: "Your Squad",
         inputId: "squadFileInput",
         clearId: "clearSquadBaseline",
+        divisionSelectId: "squadDivisionOverride",
         clearLabel: "Clear squad",
         uploadLabel: "Upload your squad",
         emptyCopy: "Your saved squad stays in this browser and is used as the comparison baseline for upgrade calls.",
@@ -1469,6 +1507,7 @@ function renderSquadPlanner() {
         title: "Benchmark Squad",
         inputId: "benchmarkFileInput",
         clearId: "clearBenchmarkSquad",
+        divisionSelectId: "benchmarkDivisionOverride",
         clearLabel: "Clear benchmark",
         uploadLabel: "Upload benchmark",
         emptyCopy: "Use a Champions League winner, league winner, rival, or best-in-save squad as the target standard.",
@@ -1496,6 +1535,20 @@ function renderSquadPlanner() {
 function bindSquadPlannerControls() {
   app.querySelector("#squadFileInput")?.addEventListener("change", (event) => importSquadFile(event.target.files[0]));
   app.querySelector("#benchmarkFileInput")?.addEventListener("change", (event) => importBenchmarkFile(event.target.files[0]));
+  app.querySelector("#squadDivisionOverride")?.addEventListener("change", (event) => {
+    const squad = state.squadBaseline;
+    if (!squad) return;
+    state.squadBaseline = buildSquadBaseline(squad.rows, { name: squad.name, savedAt: squad.savedAt, divisionOverride: event.target.value });
+    saveSquadBaseline();
+    render();
+  });
+  app.querySelector("#benchmarkDivisionOverride")?.addEventListener("change", (event) => {
+    const benchmark = state.benchmarkSquad;
+    if (!benchmark) return;
+    state.benchmarkSquad = buildSquadBaseline(benchmark.rows, { name: benchmark.name, savedAt: benchmark.savedAt, divisionOverride: event.target.value });
+    saveBenchmarkSquad();
+    render();
+  });
   app.querySelector("#clearSquadBaseline")?.addEventListener("click", () => {
     if (!confirm("Clear your saved squad baseline from this browser?")) return;
     state.squadBaseline = null;

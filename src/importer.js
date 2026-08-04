@@ -4,6 +4,10 @@ const CLUB_DIVISION_OVERRIDES = new Map([
   ["riotinto", { division: "No league data", note: "Rio Tinto division corrected to No league data from exported league value" }],
 ]);
 
+const SQUAD_DIVISION_ALIASES = new Map([
+  ["premierleague", "English Premier Division"],
+]);
+
 export const HEADER_ALIASES = new Map(Object.entries({
   "mins": ["Minutes"],
   "playername": ["Player", "Name"],
@@ -188,6 +192,24 @@ export function rowGetter(row) {
     }
     return "";
   };
+}
+
+export function dominantDivisionForRows(rows) {
+  const counts = new Map();
+  for (const row of rows) {
+    const division = String(rowGetter(row)("Division") || "").trim();
+    if (!division) continue;
+    counts.set(division, (counts.get(division) || 0) + 1);
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] || "";
+}
+
+export function applySquadDivisionOverride(rows, divisionOverride) {
+  const requestedDivision = String(divisionOverride || "").trim();
+  if (!requestedDivision) return rows;
+  const division = SQUAD_DIVISION_ALIASES.get(normalise(requestedDivision)) || requestedDivision;
+  return rows.map((row) => ({ ...row, Division: division }));
 }
 
 export function headerMatches(headers, header) {

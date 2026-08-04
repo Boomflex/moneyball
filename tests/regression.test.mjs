@@ -2,10 +2,20 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { WORKBOOK_MODEL } from "../src/model.js";
 import { applyLeagueOverrides, resolveLeague } from "../src/league-overrides.js";
-import { analyzeImport, inferImportRole, parseCsv } from "../src/importer.js";
+import { analyzeImport, applySquadDivisionOverride, dominantDivisionForRows, inferImportRole, parseCsv } from "../src/importer.js";
 import { controlProfileForRow, recalcRows } from "../src/scoring.js";
 
 const MODEL = applyLeagueOverrides(WORKBOOK_MODEL);
+
+const mixedSquadRows = [
+  { Player: "First", Division: "Premier League" },
+  { Player: "Second", Division: "Regional Div. West" },
+  { Player: "Third", Division: "Premier League" },
+];
+assert.equal(dominantDivisionForRows(mixedSquadRows), "Premier League", "Squad imports should default to their dominant division");
+const overriddenSquadRows = applySquadDivisionOverride(mixedSquadRows, "Premier League");
+assert.ok(overriddenSquadRows.every((row) => row.Division === "English Premier Division"), "Squad division override should resolve FM's Premier League label for scoring");
+assert.equal(mixedSquadRows[1].Division, "Regional Div. West", "Squad division override should preserve imported rows");
 
 const EXPORTS = {
   GK: {
