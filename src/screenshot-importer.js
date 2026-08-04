@@ -1,22 +1,5 @@
 import { normalise } from "./utils.js";
 
-const PER_90_FIELDS = new Set([
-  "Goals Per 90",
-  "Non Penalty xGoals Per 90",
-  "xAssists Per 90",
-  "Open Play Key Passes Per 90",
-  "Chances Created Per 90",
-  "Progressive Passes Per 90",
-  "Passes Completed Per 90",
-  "Possession Won Per 90",
-  "Possession Lost Per 90",
-  "Tackles Completed Per 90",
-  "Headers Won Per 90",
-  "Interceptions Per 90",
-  "Blocks Per 90",
-  "Mistakes Per 90",
-]);
-
 export const SCREENSHOT_META_FIELDS = [
   { key: "Player Name", label: "Player", placeholder: "Player name" },
   { key: "Age", label: "Age", placeholder: "Age" },
@@ -118,6 +101,37 @@ const STAT_ALIASES = new Map([
 ]);
 
 const META_LABELS = new Set(["attacking", "passescompleted", "defensive", "goalkeeper", "competition", "apps", "goals", "assists", "xg", "xa", "pens", "pom", "yel", "red", "pas", "avgrat"]);
+const COMPETITION_PATTERN = /\b(?:bundesliga|league|division|liga|serie|premier|championship|eredivisie|jupiler|national league)\b/i;
+const NON_COMPETITION_PATTERN = /\b(?:national:|portal|squad|overview|bookmarks|tactical role|condition|caps|messages|player report|first team|under19s|training|youth setup)\b/i;
+const INLINE_STAT_PATTERNS = [
+  [/\bExpected Goals\/\s*90\s*(?:mins?)?\s+(-?\d+(?:\.\d+)?)/i, "Non Penalty xGoals Per 90"],
+  [/\bExpected Goals\s+(-?\d+(?:\.\d+)?)/i, "Expected Goals"],
+  [/\bExpected Assists\/\s*90\s*(?:mins?)?\s+(-?\d+(?:\.\d+)?)/i, "xAssists Per 90"],
+  [/\bExpected Assists\s+(-?\d+(?:\.\d+)?)/i, "Expected Assists"],
+  [/\bChances Created\s+(-?\d+(?:\.\d+)?)/i, "Chances Created"],
+  [/\bGoal Attempts\s+(-?\d+(?:\.\d+)?)/i, "Shots"],
+  [/\bShots on Target\/\s*90\s*(?:mins?)?\s+(-?\d+(?:\.\d+)?)/i, "Shots On Target Per 90"],
+  [/\bKey Passes\s+(-?\d+(?:\.\d+)?)/i, "Key Passes"],
+  [/\bProgressive Passes\/\s*90\s*(?:mins?)?\s+(-?\d+(?:\.\d+)?)/i, "Progressive Passes Per 90"],
+  [/\bPasses Completed\/\s*90\s*(?:mins?)?\s+(-?\d+(?:\.\d+)?)/i, "Passes Completed Per 90"],
+  [/\bPass Completion Percentage\s+(-?\d+(?:\.\d+)?)/i, "Pass Completion %"],
+  [/\bCrosses completed\s+(-?\d+(?:\.\d+)?)/i, "Open Play Crosses Completed"],
+  [/\bCrosses Completed Ratio\s+(-?\d+(?:\.\d+)?)/i, "Open Play Cross Completion %"],
+  [/\bPossession Won\/\s*90\s*(?:mins?)?\s+(-?\d+(?:\.\d+)?)/i, "Possession Won Per 90"],
+  [/\bPossession Lost\/\s*90\s*(?:mins?)?\s+(-?\d+(?:\.\d+)?)/i, "Possession Lost Per 90"],
+  [/\bTackles Won per Game\s+(-?\d+(?:\.\d+)?)/i, "Tackles Completed Per 90"],
+  [/\bHeaders Won\s+(-?\d+(?:\.\d+)?)/i, "Headers Won"],
+  [/\bKey Headers\/\s*90\s*(?:mins?)?\s+(-?\d+(?:\.\d+)?)/i, "Headers Won Per 90"],
+  [/\bInterceptions\s+(-?\d+(?:\.\d+)?)/i, "Interceptions"],
+  [/\bShots Blocked\s+(-?\d+(?:\.\d+)?)/i, "Blocks"],
+  [/\bFouls\/\s*90\s+(-?\d+(?:\.\d+)?)/i, "Fouls Made Per 90"],
+  [/\bMistakes Leading to Goals\s+(-?\d+(?:\.\d+)?)/i, "Mistakes Leading to Goals"],
+  [/\bConceded\/\s*90\s*(?:mins?)?\s+(-?\d+(?:\.\d+)?)/i, "Goals Allowed Per 90"],
+  [/\bSaves\/\s*90\s+(-?\d+(?:\.\d+)?)/i, "Saves Per 90"],
+  [/\bExpected Goals Prevented\/\s*90\s*(?:mins?)?\s+(-?\d+(?:\.\d+)?)/i, "xGoals Prevented Per 90"],
+  [/\bMinutes on Pitch Per Goal\s+(-?\d+(?:\.\d+)?)/i, "Minutes on Pitch Per Goal"],
+  [/\bMinutes on Pitch Per Assist\s+(-?\d+(?:\.\d+)?)/i, "Minutes on Pitch Per Assist"],
+];
 
 export function createEmptyScreenshotDraft() {
   return {
@@ -146,6 +160,34 @@ function valueFromLine(line) {
   const match = line.trim().match(/(.+?)\s+(-?\(?\u00a3?\d[\d,.]*(?:\.\d+)?\)?(?:[KMB])?(?:\s*p\/w)?%?)$/i);
   if (!match) return null;
   return { label: match[1].trim(), value: match[2].replace(/^\((.*)\)$/, "$1").trim() };
+}
+
+function cleanOcrLine(line) {
+  return line
+    .replace(/["'=|]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isCompetitionLine(line) {
+  return COMPETITION_PATTERN.test(line) && !NON_COMPETITION_PATTERN.test(line);
+}
+
+function extractPosition(line) {
+  const clean = cleanOcrLine(line);
+  const match = clean.match(/\b(?:(?:Defensive|Attacking)\s+)?(?:Goalkeeper|Defender|Midfielder|Winger|Striker|Forward)(?:\/(?:Defensive|Attacking)?\s*(?:Defender|Midfielder|Winger|Striker|Forward))*\s*(?:\([^)]+\))?/i);
+  return match ? match[0].replace(/\s+/g, " ").trim() : "";
+}
+
+function extractInlineStats(draft, line) {
+  let found = 0;
+  for (const [pattern, target] of INLINE_STAT_PATTERNS) {
+    const match = line.match(pattern);
+    if (!match) continue;
+    setDetected(draft, target, match[1], line);
+    found += 1;
+  }
+  return found;
 }
 
 function canonicalStat(label) {
@@ -191,15 +233,11 @@ function inferMetaFromText(draft, lines) {
   const wage = joined.match(/\u00a3\s?\d+(?:\.\d+)?\s?[KMB]?\s*p\/w/i)?.[0];
   if (wage) draft.meta["Actual Wage (\u00a3/wk)"] = wage;
 
-  const values = [...joined.matchAll(/\u00a3\s?\d+(?:\.\d+)?\s?[KMB]?/gi)].map((match) => match[0]);
-  const value = values.find((item) => !/p\/w/i.test(item));
-  if (value) draft.meta["Actual Value (\u00a3)"] = value;
+  const values = [...joined.matchAll(/\u00a3\s?\d+(?:\.\d+)?\s?[KMB](?!\s*p\/w)/gi)].map((match) => match[0]);
+  if (values[0]) draft.meta["Actual Value (\u00a3)"] = values[0];
 
-  const clubIndex = lines.findIndex((line) => /regular starter|important player|fringe player|star player/i.test(line));
-  if (clubIndex > 0) draft.meta.Club = lines[clubIndex - 1].replace(/^[^A-Za-z0-9]+\s+/, "").trim();
-
-  const positionLine = lines.find((line) => /midfielder|defender|striker|winger|goalkeeper/i.test(line) && !/tactical role/i.test(line));
-  if (positionLine) draft.meta["Best Position"] = positionLine.replace(/^[^A-Za-z0-9]+\s+/, "").trim();
+  const position = lines.map(extractPosition).find(Boolean);
+  if (position) draft.meta["Best Position"] = position;
 }
 
 function estimateMinutes(draft) {
@@ -283,10 +321,11 @@ export function parseFmScreenshotText(text, manualMeta = {}) {
       continue;
     }
 
+    extractInlineStats(draft, line);
     const pair = valueFromLine(line);
     if (!pair) {
       const maybeDivision = normalise(line);
-      if (!draft.meta.Division && maybeDivision && !META_LABELS.has(maybeDivision) && /league|division|bundesliga|serie|liga|premier|championship|eredivisie|jupiler|national/i.test(line)) {
+      if (!draft.meta.Division && maybeDivision && !META_LABELS.has(maybeDivision) && isCompetitionLine(line)) {
         draft.meta.Division = line;
       }
       continue;
@@ -294,11 +333,10 @@ export function parseFmScreenshotText(text, manualMeta = {}) {
 
     const target = canonicalStat(pair.label);
     if (target) setDetected(draft, target, pair.value, line);
-    if (!draft.meta.Division && /league|division|bundesliga|serie|liga|premier|championship|eredivisie|jupiler|national/i.test(pair.label)) {
+    if (!draft.meta.Division && isCompetitionLine(pair.label)) {
       draft.meta.Division = pair.label;
     }
   }
-
   deriveRates(draft);
   deriveShotAccuracy(draft);
   normalizePercentageStats(draft);

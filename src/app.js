@@ -1069,6 +1069,67 @@ function renderScreenshotImportPanel() {
   </section>`;
 }
 
+function imageSourceFromFile(file) {
+  if (window.createImageBitmap) return window.createImageBitmap(file);
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Screenshot image could not be prepared."));
+    };
+    image.src = url;
+  });
+}
+
+function thresholdCanvasForOcr(canvas, threshold = 95) {
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) throw new Error("Screenshot image could not be processed.");
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const pixels = imageData.data;
+  for (let index = 0; index < pixels.length; index += 4) {
+    const luminance = pixels[index] * 0.2126 + pixels[index + 1] * 0.7152 + pixels[index + 2] * 0.0722;
+    const mono = luminance > threshold ? 0 : 255;
+    pixels[index] = mono;
+    pixels[index + 1] = mono;
+    pixels[index + 2] = mono;
+    pixels[index + 3] = 255;
+  }
+  ctx.putImageData(imageData, 0, 0);
+}
+
+async function enhancedStatsCanvas(file) {
+  const image = await imageSourceFromFile(file);
+  const width = image.width || image.naturalWidth;
+  const height = image.height || image.naturalHeight;
+  const cropY = Math.round(height * 0.48);
+  const cropHeight = Math.max(1, height - cropY);
+  const scale = width < 1800 ? 2 : 1.5;
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(width * scale);
+  canvas.height = Math.round(cropHeight * scale);
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) throw new Error("Screenshot image could not be processed.");
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.filter = "grayscale(1) contrast(1.85) brightness(1.12)";
+  ctx.drawImage(image, 0, cropY, width, cropHeight, 0, 0, canvas.width, canvas.height);
+  thresholdCanvasForOcr(canvas);
+  if (typeof image.close === "function") image.close();
+  return canvas;
+}
+
+function mergeOcrText(...parts) {
+  return parts
+    .map((part) => String(part || "").trim())
+    .filter(Boolean)
+    .join("\n\n--- Enhanced stat panel OCR ---\n\n");
+}
+
 function loadTesseract() {
   if (window.Tesseract) return Promise.resolve(window.Tesseract);
   return new Promise((resolve, reject) => {
@@ -1101,8 +1162,11 @@ async function runScreenshotOcr(file) {
       },
     });
     const result = await worker.recognize(file);
+    setScreenshotStatus("Reading stat panel", "enhancing crop");
+    const statCanvas = await enhancedStatsCanvas(file);
+    const statResult = await worker.recognize(statCanvas);
     await worker.terminate();
-    state.screenshotOcrText = result?.data?.text || "";
+    state.screenshotOcrText = mergeOcrText(result?.data?.text, statResult?.data?.text);
     state.screenshotDraft = parseFmScreenshotText(state.screenshotOcrText, screenshotMetaFromInputs());
     setScreenshotStatus("OCR complete", "Review before import");
   } catch (error) {
