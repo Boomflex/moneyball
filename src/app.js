@@ -13,7 +13,6 @@ import {
   similarPlayers,
   statColumnKey,
 } from "./scoring.js";
-import { parseFmScreenshotText, screenshotConfidence, screenshotDraftToRow, SCREENSHOT_META_FIELDS, SCREENSHOT_REVIEW_FIELDS } from "./screenshot-importer.js";
 import { csvCell, escapeHtml, mean } from "./utils.js";
 import { fmt, formatStatValue, importReportCard, labelFor, metricCompare, playerSelectors, radar, table } from "./ui.js";
 
@@ -23,7 +22,6 @@ const SQUAD_STORAGE_KEY = "moneyball.squadBaseline.v1";
 const DATABASE_STATUSES = ["New", "Watch", "Scout", "Saved", "Ignore"];
 const DATABASE_PRIORITIES = ["", "A", "B", "C"];
 const GUIDE_BASELINE = { minutes: 1000, rating: 7 };
-const TESSERACT_CDN_URL = "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
 const guideMetric = (label, headers, options = {}) => ({ label, headers, ...options });
 const GUIDE_PRESETS = {
   goalkeeper: {
@@ -222,12 +220,6 @@ const state = {
   databaseViewName: "",
   databaseSavedView: "",
   databaseAuditId: null,
-  screenshotImageUrl: "",
-  screenshotOcrText: "",
-  screenshotDraft: null,
-  screenshotStatus: "",
-  screenshotProgress: "",
-  screenshotBusy: false,
   leaderStat: "",
   storageWarning: initialStorageWarning,
 };
@@ -987,287 +979,6 @@ function restoreInputFocus(selector, caret) {
   if (Number.isInteger(caret)) input.setSelectionRange(caret, caret);
 }
 
-function screenshotDraft() {
-  if (!state.screenshotDraft) state.screenshotDraft = parseFmScreenshotText(state.screenshotOcrText);
-  return state.screenshotDraft;
-}
-
-function screenshotMetaFromInputs() {
-  const draft = screenshotDraft();
-  const meta = { ...draft.meta };
-  app.querySelectorAll("[data-screenshot-meta]").forEach((input) => { meta[input.dataset.screenshotMeta] = input.value; });
-  return meta;
-}
-
-function updateScreenshotDraftFromInputs() {
-  const draft = screenshotDraft();
-  app.querySelectorAll("[data-screenshot-meta]").forEach((input) => { draft.meta[input.dataset.screenshotMeta] = input.value; });
-  app.querySelectorAll("[data-screenshot-stat]").forEach((input) => { draft.stats[input.dataset.screenshotStat] = input.value; });
-}
-
-function setScreenshotStatus(status, progress = "") {
-  state.screenshotStatus = status;
-  state.screenshotProgress = progress;
-  const statusEl = app.querySelector("#screenshotStatus");
-  const progressEl = app.querySelector("#screenshotProgress");
-  if (statusEl) statusEl.textContent = status;
-  if (progressEl) progressEl.textContent = progress;
-}
-
-function renderScreenshotImportPanel() {
-  const draft = screenshotDraft();
-  const confidence = screenshotConfidence(draft);
-  const warnings = draft.warnings.length
-    ? `<ul class="screenshot-warnings">${draft.warnings.map((warning) => `<li>${escapeHtml(warning)}</li>`).join("")}</ul>`
-    : "";
-  return `<section class="panel screenshot-import-panel" id="screenshotImportPanel" tabindex="0">
-    <div class="panel-head">
-      <div><span>Screenshot import</span><h2>FM Scout Card</h2></div>
-      <strong>${confidence.stats} stats detected</strong>
-    </div>
-    <div class="screenshot-import-layout">
-      <section class="screenshot-source">
-        <div class="screenshot-dropzone" id="screenshotDropzone" tabindex="0">
-          <div class="upload-icon"><span>IMG</span></div>
-          <div>
-            <h2>Paste scout screenshot</h2>
-            <p>Copy the FM screen, click this panel, then paste. You can still browse or drop an image.</p>
-          </div>
-          <input class="sr-only" id="screenshotFileInput" type="file" accept="image/*" />
-          <label class="file-picker" for="screenshotFileInput">Browse image</label>
-          <small id="screenshotStatus">${escapeHtml(state.screenshotStatus || "No screenshot selected")}</small>
-        </div>
-        ${state.screenshotImageUrl ? `<figure class="screenshot-preview"><img src="${escapeHtml(state.screenshotImageUrl)}" alt="Imported FM screenshot preview" /></figure>` : ""}
-        <label>OCR text
-          <textarea id="screenshotOcrText" rows="8" placeholder="Paste OCR text here if automatic OCR is unavailable">${escapeHtml(state.screenshotOcrText)}</textarea>
-        </label>
-        <div class="screenshot-actions">
-          <button class="ghost" id="parseScreenshotText" type="button">Extract text</button>
-          <button class="ghost" id="clearScreenshotImport" type="button">Clear</button>
-          <span id="screenshotProgress">${escapeHtml(state.screenshotProgress)}</span>
-        </div>
-      </section>
-      <section class="screenshot-review">
-        <div class="panel-head compact"><div><span>Review row</span><h2>Player Details</h2></div></div>
-        <div class="screenshot-meta-grid">
-          ${SCREENSHOT_META_FIELDS.map((field) => `<label>${escapeHtml(field.label)}
-            <input data-screenshot-meta="${escapeHtml(field.key)}" value="${escapeHtml(draft.meta[field.key] || "")}" placeholder="${escapeHtml(field.placeholder)}" />
-          </label>`).join("")}
-        </div>
-        <div class="screenshot-stat-review">
-          ${SCREENSHOT_REVIEW_FIELDS.map((field) => `<label>${escapeHtml(labelFor(field))}
-            <input data-screenshot-stat="${escapeHtml(field)}" value="${escapeHtml(draft.stats[field] || "")}" placeholder="-" />
-          </label>`).join("")}
-        </div>
-        ${warnings}
-        <div class="screenshot-actions import-actions">
-          <button class="primary" id="importScreenshotReplace" type="button">Import player</button>
-          <button class="ghost" id="importScreenshotAppend" type="button" ${state.rows.length ? "" : "disabled"}>Add to board</button>
-        </div>
-      </section>
-    </div>
-  </section>`;
-}
-
-function imageSourceFromFile(file) {
-  if (window.createImageBitmap) return window.createImageBitmap(file);
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const image = new Image();
-    image.onload = () => {
-      URL.revokeObjectURL(url);
-      resolve(image);
-    };
-    image.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error("Screenshot image could not be prepared."));
-    };
-    image.src = url;
-  });
-}
-
-function thresholdCanvasForOcr(canvas, threshold = 95) {
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  if (!ctx) throw new Error("Screenshot image could not be processed.");
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const pixels = imageData.data;
-  for (let index = 0; index < pixels.length; index += 4) {
-    const luminance = pixels[index] * 0.2126 + pixels[index + 1] * 0.7152 + pixels[index + 2] * 0.0722;
-    const mono = luminance > threshold ? 0 : 255;
-    pixels[index] = mono;
-    pixels[index + 1] = mono;
-    pixels[index + 2] = mono;
-    pixels[index + 3] = 255;
-  }
-  ctx.putImageData(imageData, 0, 0);
-}
-
-async function enhancedRegionCanvas(file, region) {
-  const image = await imageSourceFromFile(file);
-  const width = image.width || image.naturalWidth;
-  const height = image.height || image.naturalHeight;
-  const cropX = Math.round(width * (region.left || 0));
-  const cropY = Math.round(height * (region.top || 0));
-  const cropWidth = Math.max(1, Math.round(width * (region.width || 1)));
-  const cropHeight = Math.max(1, Math.round(height * (region.height || 1)));
-  const scale = region.scale || (width < 1800 ? 2 : 1.5);
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.round(cropWidth * scale);
-  canvas.height = Math.round(cropHeight * scale);
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  if (!ctx) throw new Error("Screenshot image could not be processed.");
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.filter = "grayscale(1) contrast(1.85) brightness(1.12)";
-  ctx.drawImage(image, cropX, cropY, cropWidth, cropHeight, 0, 0, canvas.width, canvas.height);
-  thresholdCanvasForOcr(canvas, region.threshold || 95);
-  if (typeof image.close === "function") image.close();
-  return canvas;
-}
-
-function enhancedPlayerHeaderCanvas(file) {
-  return enhancedRegionCanvas(file, { left: 0.08, top: 0.11, width: 0.62, height: 0.16, scale: 3 });
-}
-
-function enhancedStatsCanvas(file) {
-  return enhancedRegionCanvas(file, { left: 0, top: 0.48, width: 1, height: 0.52 });
-}
-
-function mergeOcrText(...parts) {
-  return parts
-    .map((part) => String(part || "").trim())
-    .filter(Boolean)
-    .join("\n\n--- Enhanced stat panel OCR ---\n\n");
-}
-
-function loadTesseract() {
-  if (window.Tesseract) return Promise.resolve(window.Tesseract);
-  return new Promise((resolve, reject) => {
-    const existing = document.querySelector("script[data-tesseract]");
-    if (existing) {
-      existing.addEventListener("load", () => resolve(window.Tesseract));
-      existing.addEventListener("error", reject);
-      return;
-    }
-    const script = document.createElement("script");
-    script.src = TESSERACT_CDN_URL;
-    script.async = true;
-    script.dataset.tesseract = "true";
-    script.onload = () => window.Tesseract ? resolve(window.Tesseract) : reject(new Error("OCR library did not initialize."));
-    script.onerror = () => reject(new Error("OCR library could not be loaded."));
-    document.head.appendChild(script);
-  });
-}
-
-async function runScreenshotOcr(file) {
-  state.screenshotBusy = true;
-  setScreenshotStatus("Loading OCR", "");
-  try {
-    const Tesseract = await loadTesseract();
-    const worker = await Tesseract.createWorker("eng", 1, {
-      logger: (message) => {
-        if (!message?.status) return;
-        const pct = Number.isFinite(message.progress) ? `${Math.round(message.progress * 100)}%` : "";
-        setScreenshotStatus(message.status, pct);
-      },
-    });
-    const result = await worker.recognize(file);
-    setScreenshotStatus("Reading player header", "enhancing crop");
-    const headerCanvas = await enhancedPlayerHeaderCanvas(file);
-    const headerResult = await worker.recognize(headerCanvas);
-    setScreenshotStatus("Reading stat panel", "enhancing crop");
-    const statCanvas = await enhancedStatsCanvas(file);
-    const statResult = await worker.recognize(statCanvas);
-    await worker.terminate();
-    state.screenshotOcrText = mergeOcrText(result?.data?.text, headerResult?.data?.text, statResult?.data?.text);
-    state.screenshotDraft = parseFmScreenshotText(state.screenshotOcrText, screenshotMetaFromInputs());
-    setScreenshotStatus("OCR complete", "Review before import");
-  } catch (error) {
-    state.screenshotStatus = "OCR unavailable";
-    state.screenshotProgress = "Paste text instead";
-    state.storageWarning = error?.message || "OCR could not read the screenshot.";
-  } finally {
-    state.screenshotBusy = false;
-    render();
-  }
-}
-
-function handleScreenshotFile(file) {
-  if (!file || !file.type.startsWith("image/")) return;
-  if (state.screenshotImageUrl) URL.revokeObjectURL(state.screenshotImageUrl);
-  state.screenshotImageUrl = URL.createObjectURL(file);
-  state.screenshotStatus = "Screenshot loaded";
-  state.screenshotProgress = "";
-  state.screenshotDraft = parseFmScreenshotText(state.screenshotOcrText, screenshotMetaFromInputs());
-  render();
-  runScreenshotOcr(file);
-}
-
-function parseScreenshotTextFromReview() {
-  const text = app.querySelector("#screenshotOcrText")?.value || state.screenshotOcrText;
-  state.screenshotOcrText = text;
-  state.screenshotDraft = parseFmScreenshotText(text, screenshotMetaFromInputs());
-  state.screenshotStatus = "Text extracted";
-  state.screenshotProgress = "Review before import";
-  render();
-}
-
-function clearScreenshotImport() {
-  if (state.screenshotImageUrl) URL.revokeObjectURL(state.screenshotImageUrl);
-  state.screenshotImageUrl = "";
-  state.screenshotOcrText = "";
-  state.screenshotDraft = parseFmScreenshotText("");
-  state.screenshotStatus = "";
-  state.screenshotProgress = "";
-  state.screenshotBusy = false;
-  render();
-}
-
-function importScreenshotDraft({ append = false } = {}) {
-  updateScreenshotDraftFromInputs();
-  const row = screenshotDraftToRow(screenshotDraft());
-  setRows(append && state.rows.length ? [...state.rows, row] : [row]);
-}
-
-function imageFileFromPaste(event) {
-  return [...(event.clipboardData?.items || [])]
-    .find((entry) => entry.type.startsWith("image/"))
-    ?.getAsFile() || null;
-}
-
-function handleScreenshotPaste(event) {
-  const file = imageFileFromPaste(event);
-  if (!file) return;
-  event.preventDefault();
-  handleScreenshotFile(file);
-}
-
-function bindScreenshotImport() {
-  const input = app.querySelector("#screenshotFileInput");
-  const panel = app.querySelector("#screenshotImportPanel");
-  const dropzone = app.querySelector("#screenshotDropzone");
-  input?.addEventListener("change", () => handleScreenshotFile(input.files[0]));
-  panel?.addEventListener("paste", handleScreenshotPaste);
-  panel?.addEventListener("click", (event) => {
-    if (!event.target.closest("button, input, label, select, textarea")) panel.focus();
-  });
-  dropzone?.addEventListener("click", () => dropzone.focus());
-  dropzone?.addEventListener("dragover", (event) => { event.preventDefault(); dropzone.classList.add("dragging"); });
-  dropzone?.addEventListener("dragleave", () => dropzone.classList.remove("dragging"));
-  dropzone?.addEventListener("drop", (event) => {
-    event.preventDefault();
-    dropzone.classList.remove("dragging");
-    handleScreenshotFile([...event.dataTransfer.files].find((file) => file.type.startsWith("image/")));
-  });
-  dropzone?.addEventListener("paste", handleScreenshotPaste);
-  app.querySelector("#parseScreenshotText")?.addEventListener("click", parseScreenshotTextFromReview);
-  app.querySelector("#clearScreenshotImport")?.addEventListener("click", clearScreenshotImport);
-  app.querySelector("#importScreenshotReplace")?.addEventListener("click", () => importScreenshotDraft({ append: false }));
-  app.querySelector("#importScreenshotAppend")?.addEventListener("click", () => importScreenshotDraft({ append: true }));
-  app.querySelectorAll("[data-screenshot-meta], [data-screenshot-stat]").forEach((inputEl) => inputEl.addEventListener("input", updateScreenshotDraftFromInputs));
-  app.querySelector("#screenshotOcrText")?.addEventListener("input", (event) => { state.screenshotOcrText = event.target.value; });
-}
-
 function renderImport() {
   const content = `
     <section class="import-hero">
@@ -1300,7 +1011,6 @@ function renderImport() {
         </div>
       </section>
     </section>
-    ${renderScreenshotImportPanel()}
   `;
   renderShell(content);
   const fileInput = app.querySelector("#fileInput");
@@ -1319,7 +1029,6 @@ function renderImport() {
     importFile(file);
   });
   app.querySelector("#downloadTemplate")?.addEventListener("click", downloadCsvTemplate);
-  bindScreenshotImport();
 }
 
 function downloadCsvTemplate() {
