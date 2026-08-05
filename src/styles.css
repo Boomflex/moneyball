@@ -1995,6 +1995,10 @@ tbody tr.selected-row:hover {
   min-width: 1420px;
 }
 
+.upgrade-table.no-benchmark {
+  min-width: 1050px;
+}
+
 .upgrade-table th:nth-child(3),
 .upgrade-table td:nth-child(3),
 .upgrade-table th:nth-child(5),
@@ -2023,6 +2027,10 @@ tbody tr.selected-row:hover {
 
 .planner-table {
   min-width: 1540px;
+}
+
+.planner-table.no-benchmark {
+  min-width: 1150px;
 }
 
 .planner-table th:nth-child(n+2):nth-child(-n+6),

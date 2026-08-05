@@ -1487,7 +1487,17 @@ function renderSquadPlanner() {
   const upgrades = squadUpgradeRows();
   const squad = state.squadBaseline;
   const benchmark = state.benchmarkSquad;
-  const benchmarkClosers = upgrades.filter((row) => ["At benchmark", "Strong benchmark closer", "Benchmark closer", "Clear upgrade", "Possible upgrade"].includes(row.upgradeCall)).length;
+  const hasBenchmark = Boolean(benchmark?.players.length);
+  const positiveCalls = hasBenchmark
+    ? ["At benchmark", "Strong benchmark closer", "Benchmark closer"]
+    : ["Clear upgrade", "Possible upgrade", "Squad gap"];
+  const opportunityCount = upgrades.filter((row) => positiveCalls.includes(row.upgradeCall)).length;
+  const upgradeColumns = hasBenchmark
+    ? ["role", "squadPlayer", "squadScore", "benchmarkPlayer", "benchmarkScore", "benchmarkGap", "candidate", "candidateScore", "scoreGap", "candidateBenchmarkGap", "candidateDivision", "candidateValue", "dealFlag", "upgradeCall"]
+    : ["role", "squadPlayer", "squadScore", "candidate", "candidateScore", "scoreGap", "candidateDivision", "candidateValue", "dealFlag", "upgradeCall"];
+  const plannerColumns = hasBenchmark
+    ? ["role", "squadCount", "squadBest", "squadBestScore", "benchmarkCount", "benchmarkBest", "benchmarkScore", "benchmarkGap", "candidates", "topCandidate", "bestRole", "bestScore", "scoreGap", "candidateBenchmarkGap", "avgScore", "action"]
+    : ["role", "squadCount", "squadBest", "squadBestScore", "candidates", "topCandidate", "bestRole", "bestScore", "scoreGap", "avgScore", "action"];
   renderShell(`
     <section class="squad-baseline-grid">
       ${squadSnapshotCard({
@@ -1514,18 +1524,18 @@ function renderSquadPlanner() {
       })}
       <section class="panel squad-upgrade-panel">
         <div class="panel-head compact">
-          <div><span>Benchmark radar</span><h2>Candidate vs Your Squad vs Benchmark</h2></div>
-          <strong>${benchmarkClosers} benchmark closers</strong>
+          <div><span>${hasBenchmark ? "Benchmark radar" : "Upgrade radar"}</span><h2>${hasBenchmark ? "Candidate vs Your Squad vs Benchmark" : "Candidate vs Your Squad"}</h2></div>
+          <strong>${opportunityCount} ${hasBenchmark ? "benchmark closers" : "upgrade options"}</strong>
         </div>
-        ${squad ? table(upgrades, ["role", "squadPlayer", "squadScore", "benchmarkPlayer", "benchmarkScore", "benchmarkGap", "candidate", "candidateScore", "scoreGap", "candidateBenchmarkGap", "candidateDivision", "candidateValue", "dealFlag", "upgradeCall"], "upgrade-table", { rowClass: (row) => ["At benchmark", "Strong benchmark closer", "Benchmark closer", "Clear upgrade", "Possible upgrade"].includes(row.upgradeCall) ? "upgrade-row" : "" }) : `<div class="empty">Upload your squad CSV to unlock upgrade comparisons.</div>`}
+        ${squad ? table(upgrades, upgradeColumns, `upgrade-table${hasBenchmark ? "" : " no-benchmark"}`, { rowClass: (row) => positiveCalls.includes(row.upgradeCall) ? "upgrade-row" : "" }) : `<div class="empty">Upload your squad CSV to unlock upgrade comparisons.</div>`}
       </section>
     </section>
     <section class="panel squad-planner-panel">
       <div class="panel-head">
-        <div><span>Role coverage</span><h2>Squad Benchmark</h2></div>
-        <strong>${state.players.length} recruitment / ${squad?.players.length || 0} yours / ${benchmark?.players.length || 0} benchmark</strong>
+        <div><span>Role coverage</span><h2>${hasBenchmark ? "Squad Benchmark" : "Squad Overview"}</h2></div>
+        <strong>${state.players.length} recruitment / ${squad?.players.length || 0} yours${hasBenchmark ? ` / ${benchmark.players.length} benchmark` : ""}</strong>
       </div>
-      ${table(rows, ["role", "squadCount", "squadBest", "squadBestScore", "benchmarkCount", "benchmarkBest", "benchmarkScore", "benchmarkGap", "candidates", "topCandidate", "bestRole", "bestScore", "scoreGap", "candidateBenchmarkGap", "avgScore", "action"], "planner-table")}
+      ${table(rows, plannerColumns, `planner-table${hasBenchmark ? "" : " no-benchmark"}`)}
     </section>
   `, { showControls: false, showImportReport: false });
   bindTable();
