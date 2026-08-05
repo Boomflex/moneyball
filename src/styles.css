@@ -1325,10 +1325,144 @@ tbody tr.selected-row:hover {
 
 .score-audit-panel {
   display: grid;
+  grid-column: 1 / -1;
   gap: 10px;
   padding: 12px;
 }
 
+.percentile-profile-panel {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  justify-items: stretch;
+  padding: 12px;
+  overflow: hidden;
+}
+
+.pizza-stage {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.percentile-pizza {
+  width: min(100%, 660px);
+  min-width: 520px;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
+
+.pizza-grid circle {
+  fill: none;
+  stroke: rgba(230, 230, 250, .09);
+  stroke-width: 1;
+}
+
+.pizza-track {
+  fill: rgba(230, 230, 250, .045);
+  stroke: rgba(230, 230, 250, .08);
+  stroke-width: 1;
+}
+
+.pizza-fill {
+  opacity: .82;
+  stroke-width: 1;
+}
+
+.pizza-slice.attacking .pizza-fill {
+  fill: #ff4164;
+  stroke: #ff718c;
+}
+
+.pizza-slice.possession .pizza-fill {
+  fill: #b874ff;
+  stroke: #d2a9ff;
+}
+
+.pizza-slice.defending .pizza-fill {
+  fill: #e6c85c;
+  stroke: #f3df91;
+}
+
+.pizza-benchmark-marker {
+  fill: none;
+  stroke: #f5f3ff;
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.pizza-center {
+  fill: #12172b;
+  stroke: rgba(230, 230, 250, .5);
+  stroke-width: 2;
+}
+
+.pizza-center-label,
+.pizza-center-value {
+  fill: var(--ink);
+  text-anchor: middle;
+  font-weight: 950;
+}
+
+.pizza-center-label {
+  font-size: 14px;
+}
+
+.pizza-center-value {
+  fill: var(--accent);
+  font-size: 13px;
+}
+
+.pizza-label {
+  fill: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.pizza-value {
+  fill: var(--ink);
+  font-size: 10px;
+}
+
+.pizza-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.pizza-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pizza-legend i {
+  width: 9px;
+  height: 9px;
+  display: inline-block;
+  border-radius: 2px;
+}
+
+.pizza-legend .attacking {
+  background: #ff4164;
+}
+
+.pizza-legend .possession {
+  background: #b874ff;
+}
+
+.pizza-legend .defending {
+  background: #e6c85c;
+}
+
+.pizza-legend .benchmark {
+  height: 3px;
+  border-radius: 999px;
+  background: #f5f3ff;
+}
 .audit-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(120px, 1fr));

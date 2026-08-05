@@ -3,7 +3,7 @@ import fs from "node:fs";
 import { WORKBOOK_MODEL } from "../src/model.js";
 import { applyLeagueOverrides, resolveLeague } from "../src/league-overrides.js";
 import { analyzeImport, applySquadDivisionOverride, dominantDivisionForRows, inferImportRole, parseCsv } from "../src/importer.js";
-import { controlProfileForRow, recalcRows } from "../src/scoring.js";
+import { controlProfileForRow, percentileForStat, recalcRows } from "../src/scoring.js";
 
 const MODEL = applyLeagueOverrides(WORKBOOK_MODEL);
 
@@ -16,6 +16,14 @@ assert.equal(dominantDivisionForRows(mixedSquadRows), "Premier League", "Squad i
 const overriddenSquadRows = applySquadDivisionOverride(mixedSquadRows, "Premier League");
 assert.ok(overriddenSquadRows.every((row) => row.Division === "English Premier Division"), "Squad division override should resolve FM's Premier League label for scoring");
 assert.equal(mixedSquadRows[1].Division, "Regional Div. West", "Squad division override should preserve imported rows");
+
+const percentileRole = { id: "Test" };
+const percentilePlayers = [1, 2, 3].map((value) => ({ role: "Test", source: { Metric: value } }));
+assert.ok(
+  percentileForStat(percentilePlayers[0], { header: "Metric", direction: -1 }, percentileRole, percentilePlayers)
+    > percentileForStat(percentilePlayers[2], { header: "Metric", direction: -1 }, percentileRole, percentilePlayers),
+  "Lower-is-better metrics should invert percentile rank",
+);
 
 const EXPORTS = {
   GK: {

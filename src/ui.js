@@ -267,6 +267,78 @@ function metricBar(name, value, series, rawValue, label) {
     <strong>${safe}${actual}</strong>
   </div>`;
 }
+function polarPoint(center, radius, angle) {
+  return {
+    x: center + Math.cos(angle) * radius,
+    y: center + Math.sin(angle) * radius,
+  };
+}
+
+function pizzaSlicePath(center, innerRadius, outerRadius, startAngle, endAngle) {
+  const outerStart = polarPoint(center, outerRadius, startAngle);
+  const outerEnd = polarPoint(center, outerRadius, endAngle);
+  const innerEnd = polarPoint(center, innerRadius, endAngle);
+  const innerStart = polarPoint(center, innerRadius, startAngle);
+  const largeArc = endAngle - startAngle > Math.PI ? 1 : 0;
+  return [
+    `M ${outerStart.x} ${outerStart.y}`,
+    `A ${outerRadius} ${outerRadius} 0 ${largeArc} 1 ${outerEnd.x} ${outerEnd.y}`,
+    `L ${innerEnd.x} ${innerEnd.y}`,
+    `A ${innerRadius} ${innerRadius} 0 ${largeArc} 0 ${innerStart.x} ${innerStart.y}`,
+    "Z",
+  ].join(" ");
+}
+
+function pizzaMarkerPath(center, radius, startAngle, endAngle) {
+  const start = polarPoint(center, radius, startAngle);
+  const end = polarPoint(center, radius, endAngle);
+  return `M ${start.x} ${start.y} A ${radius} ${radius} 0 0 1 ${end.x} ${end.y}`;
+}
+
+export function percentilePizza(rows, { centerLabel = "", centerValue = "" } = {}) {
+  if (!rows.length) return `<div class="empty">No percentile metrics available.</div>`;
+  const size = 620;
+  const center = size / 2;
+  const innerRadius = 48;
+  const outerRadius = 178;
+  const labelRadius = 244;
+  const sliceAngle = (Math.PI * 2) / rows.length;
+  const gap = Math.min(0.035, sliceAngle * 0.12);
+  const grid = [25, 50, 75, 100].map((value) => {
+    const radius = innerRadius + (outerRadius - innerRadius) * value / 100;
+    return `<circle cx="${center}" cy="${center}" r="${radius}" />`;
+  }).join("");
+  const slices = rows.map((row, index) => {
+    const startAngle = -Math.PI / 2 + index * sliceAngle + gap;
+    const endAngle = -Math.PI / 2 + (index + 1) * sliceAngle - gap;
+    const midAngle = (startAngle + endAngle) / 2;
+    const percentile = Math.max(1, Math.min(99, Number(row.percentile) || 0));
+    const fillRadius = innerRadius + (outerRadius - innerRadius) * percentile / 100;
+    const markerPercentile = Number.isFinite(row.benchmarkPercentile) ? Math.max(1, Math.min(99, row.benchmarkPercentile)) : null;
+    const markerRadius = markerPercentile === null ? null : innerRadius + (outerRadius - innerRadius) * markerPercentile / 100;
+    const title = `${row.label}: ${row.valueLabel || "-"}, percentile ${percentile}${markerPercentile === null ? "" : `, benchmark median ${markerPercentile}`}`;
+    const labelPoint = polarPoint(center, labelRadius, midAngle);
+    const cosine = Math.cos(midAngle);
+    const anchor = cosine > 0.22 ? "start" : cosine < -0.22 ? "end" : "middle";
+    return `<g class="pizza-slice ${escapeHtml(row.category || "possession")}">
+      <title>${escapeHtml(title)}</title>
+      <path class="pizza-track" d="${pizzaSlicePath(center, innerRadius, outerRadius, startAngle, endAngle)}" />
+      <path class="pizza-fill" d="${pizzaSlicePath(center, innerRadius, fillRadius, startAngle, endAngle)}" />
+      ${markerRadius === null ? "" : `<path class="pizza-benchmark-marker" d="${pizzaMarkerPath(center, markerRadius, startAngle + gap, endAngle - gap)}" />`}
+      <text class="pizza-label" x="${labelPoint.x}" y="${labelPoint.y}" text-anchor="${anchor}">
+        <tspan x="${labelPoint.x}">${escapeHtml(compactStatLabel(row.label).slice(0, 24))}</tspan>
+        <tspan class="pizza-value" x="${labelPoint.x}" dy="15">${escapeHtml(row.valueLabel || "-")} / P${percentile}</tspan>
+      </text>
+    </g>`;
+  }).join("");
+  return `<div class="pizza-stage"><svg class="percentile-pizza" viewBox="0 0 ${size} ${size}" role="img" aria-label="Role percentile pizza chart">
+    <g class="pizza-grid">${grid}</g>
+    ${slices}
+    <circle class="pizza-center" cx="${center}" cy="${center}" r="${innerRadius - 5}" />
+    <text class="pizza-center-label" x="${center}" y="${center - 4}">${escapeHtml(centerLabel)}</text>
+    <text class="pizza-center-value" x="${center}" y="${center + 17}">${escapeHtml(centerValue)}</text>
+  </svg></div>`;
+}
 export function radar(rows) {
   if (!rows.length) return `<div class="empty">Import data to draw the chart.</div>`;
   const size = 460;

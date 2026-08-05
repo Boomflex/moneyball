@@ -345,8 +345,10 @@ export function percentileForStat(player, stat, role, players) {
     .filter(Number.isFinite)
     .sort((a, b) => a - b);
   if (!values.length) return 0;
-  const lower = values.filter((item) => item <= value).length;
-  return Math.round(clamp((lower / values.length) * 100, 1, 99));
+  const betterOrEqual = stat.direction < 0
+    ? values.filter((item) => item >= value).length
+    : values.filter((item) => item <= value).length;
+  return Math.round(clamp((betterOrEqual / values.length) * 100, 1, 99));
 }
 
 export function similarPlayers(player, players, roles) {

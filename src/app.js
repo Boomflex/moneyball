@@ -23,7 +23,7 @@ import {
   statColumnKey,
 } from "./scoring.js";
 import { csvCell, escapeHtml, mean } from "./utils.js";
-import { fmt, formatStatValue, importReportCard, labelFor, metricCompare, playerSelectors, radar, table } from "./ui.js";
+import { fmt, formatStatValue, importReportCard, labelFor, metricCompare, percentilePizza, playerSelectors, radar, table } from "./ui.js";
 
 const SCOUT_STORAGE_KEY = "moneyball.scoutRecords.v1";
 const DATABASE_VIEWS_STORAGE_KEY = "moneyball.databaseViews.v1";
@@ -1267,6 +1267,62 @@ function databaseScoreAuditRows(player) {
   }).sort((a, b) => Math.abs(b.contribution.value || 0) - Math.abs(a.contribution.value || 0));
 }
 
+function percentileMetricCategory(header) {
+  const label = String(header || "").toLowerCase();
+  if (/tackle|interception|pressure|block|clearance|header|save|prevented|allowed|mistake|possession won/.test(label)) return "defending";
+  if (/pass|progressive|possession lost/.test(label)) return "possession";
+  return "attacking";
+}
+
+function medianPercentile(values) {
+  const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
+  if (!sorted.length) return null;
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[middle] : Math.round((sorted[middle - 1] + sorted[middle]) / 2);
+}
+
+function databasePercentileProfilePanel(player) {
+  if (!player) return `<section class="panel percentile-profile-panel"><div class="empty">Import players to see a percentile profile.</div></section>`;
+  const role = roleById(roles, player.role);
+  const profile = role ? scoreProfileForPlayer(player, role) : null;
+  if (!role || !profile) return `<section class="panel percentile-profile-panel"><div class="empty">No percentile profile is available for this role.</div></section>`;
+  const peerPool = [...state.players, ...(state.squadBaseline?.players || []), ...(state.benchmarkSquad?.players || [])];
+  const rolePeers = peerPool.filter((item) => item.role === role.id);
+  const benchmarkPeers = (state.benchmarkSquad?.players || []).filter((item) => item.role === role.id);
+  const get = rowGetter(player.source);
+  const rows = [...profile.stats]
+    .sort((a, b) => b.weight - a.weight)
+    .map((stat) => ({ stat, value: valueForStat(get, stat) }))
+    .filter((item) => item.value !== null)
+    .slice(0, 12)
+    .map(({ stat, value }) => {
+      const benchmarkPercentiles = benchmarkPeers
+        .filter((peer) => valueForStat(rowGetter(peer.source), stat) !== null)
+        .map((peer) => percentileForStat(peer, stat, role, peerPool));
+      return {
+        label: stat.header,
+        valueLabel: formatStatValue({ label: stat.header, value }),
+        percentile: percentileForStat(player, stat, role, peerPool),
+        benchmarkPercentile: medianPercentile(benchmarkPercentiles),
+        category: percentileMetricCategory(stat.header),
+      };
+    });
+  const hasBenchmark = benchmarkPeers.length > 0;
+  return `<section class="panel percentile-profile-panel">
+    <div class="panel-head compact">
+      <div><span>Role percentiles</span><h2>${escapeHtml(player.player)}</h2></div>
+      <strong>${rolePeers.length} ${escapeHtml(role.id)} peers</strong>
+    </div>
+    <div class="pizza-legend" aria-label="Percentile categories">
+      <span><i class="attacking"></i>Attacking</span>
+      <span><i class="possession"></i>Possession</span>
+      <span><i class="defending"></i>Defending</span>
+      ${hasBenchmark ? '<span><i class="benchmark"></i>Benchmark median</span>' : ""}
+    </div>
+    ${percentilePizza(rows, { centerLabel: player.role, centerValue: fmt(player.bestScore) })}
+    <p class="lede">${escapeHtml(player.bestRole)} profile / ${rolePeers.length} imported role peers${hasBenchmark ? ` / ${benchmarkPeers.length} benchmark peers` : ""}</p>
+  </section>`;
+}
 function databaseScoreAuditPanel(player) {
   if (!player) return `<section class="panel score-audit-panel"><div class="empty">Import players to audit a workbook score.</div></section>`;
   const role = roleById(roles, player.role);
@@ -1317,8 +1373,9 @@ function renderPlayerDatabase() {
   renderShell(`
     ${databaseCompactSummary(basePlayers, databasePlayers)}
     <section class="recruitment-insight-grid">
-      ${databaseScoreAuditPanel(selectedAudit)}
+      ${databasePercentileProfilePanel(selectedAudit)}
       ${databaseGuideLensPanel(selectedAudit)}
+      ${databaseScoreAuditPanel(selectedAudit)}
     </section>
     <section class="panel database-panel compact-database-panel">
       <div class="panel-head">
