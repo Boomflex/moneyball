@@ -1325,7 +1325,6 @@ tbody tr.selected-row:hover {
 
 .score-audit-panel {
   display: grid;
-  grid-column: 1 / -1;
   gap: 10px;
   padding: 12px;
 }
@@ -1528,7 +1527,7 @@ tbody tr.selected-row:hover {
 
 .recruitment-insight-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.18fr) minmax(330px, .62fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   align-items: start;
 }
@@ -1537,135 +1536,6 @@ tbody tr.selected-row:hover {
   min-width: 0;
 }
 
-.guide-lens-panel {
-  display: grid;
-  gap: 10px;
-  padding: 12px;
-}
-
-.guide-call {
-  align-self: start;
-  padding: 6px 9px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  color: var(--muted);
-  background: rgba(10, 15, 30, .72);
-  font-size: 11px;
-  white-space: nowrap;
-}
-
-.guide-call.good {
-  border-color: rgba(70, 215, 167, .45);
-  color: var(--green);
-}
-
-.guide-call.warn {
-  border-color: rgba(255, 90, 40, .42);
-  color: var(--amber);
-}
-
-.guide-call.bad {
-  border-color: rgba(255, 65, 100, .45);
-  color: var(--red);
-}
-
-.guide-check-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.guide-check {
-  min-width: 0;
-  padding: 9px 10px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: rgba(10, 15, 30, .68);
-}
-
-.guide-check.is-good {
-  border-color: rgba(70, 215, 167, .38);
-}
-
-.guide-check.is-warn {
-  border-color: rgba(255, 90, 40, .38);
-}
-
-.guide-check span,
-.guide-check small {
-  display: block;
-  overflow: hidden;
-  color: var(--muted);
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: .08em;
-  text-overflow: ellipsis;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.guide-check strong {
-  display: block;
-  margin: 4px 0 2px;
-  overflow: hidden;
-  color: var(--ink);
-  font-size: 16px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.guide-metric-list {
-  display: grid;
-  gap: 6px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.guide-metric {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border: 1px solid rgba(210, 200, 245, .14);
-  border-radius: 10px;
-  background: rgba(9, 13, 29, .58);
-}
-
-.guide-metric span {
-  overflow: hidden;
-  color: var(--text);
-  font-size: 12px;
-  font-weight: 850;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.guide-metric small {
-  color: var(--muted);
-  font-size: 10px;
-  font-weight: 800;
-}
-
-.guide-metric strong {
-  color: var(--green);
-  font-size: 12px;
-  font-weight: 950;
-  white-space: nowrap;
-}
-
-.guide-metric.is-missing strong,
-.guide-metric.is-missing span {
-  color: var(--muted);
-}
-
-.guide-note {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.45;
-}
 .database-compact-summary {
   display: grid;
   grid-template-columns: repeat(6, minmax(120px, 1fr));
@@ -2239,7 +2109,6 @@ tbody tr.selected-row:hover {
 
   .stats,
   .audit-summary,
-  .guide-check-grid,
   .database-compact-summary,
   .import-report {
     grid-template-columns: repeat(2, minmax(150px, 1fr));
@@ -2293,7 +2162,6 @@ tbody tr.selected-row:hover {
 
   .stats,
   .audit-summary,
-  .guide-check-grid,
   .database-compact-summary,
   .import-report,
   .hero-metrics {
