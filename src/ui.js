@@ -52,8 +52,6 @@ export function labelFor(col) {
   return {
     totalVfm: "TOTAL VFM",
     bestScore: "Score",
-    controlScore: "Control",
-    controlCoverage: "Control conf",
     bestRole: "Role fit",
     matchedRoles: "Role scores",
     roleCount: "Roles",
@@ -122,8 +120,7 @@ export function formatCell(row, col) {
   if (col === "notes") return notesCell(row, value);
   if (col.startsWith("stat:")) return formatStatCell(value);
   if (["actualValue", "expectedValue", "actualWage", "expectedWage", "candidateValue"].includes(col)) return value ? money.format(value) : "";
-  if (["bestScore", "controlScore", "totalVfm", "valueRatio", "wageRatio", "strength", "squadBestScore", "squadScore", "benchmarkScore", "candidateScore", "scoreGap", "benchmarkGap", "candidateBenchmarkGap", "avgScore"].includes(col)) return value === null || value === undefined ? "" : fmt(value);
-  if (col === "controlCoverage") return Number.isFinite(value) ? `${fmt(value * 100)}%` : "";
+  if (["bestScore", "totalVfm", "valueRatio", "wageRatio", "strength", "squadBestScore", "squadScore", "benchmarkScore", "candidateScore", "scoreGap", "benchmarkGap", "candidateBenchmarkGap", "avgScore"].includes(col)) return value === null || value === undefined ? "" : fmt(value);
   if (["player", "dealFlag", "archetype", "upgradeCall"].includes(col)) return `<span class="${col === "dealFlag" ? flagClass(value) : col === "upgradeCall" ? upgradeClass(value) : ""}">${escapeHtml(value ?? "")}</span>`;
   return escapeHtml(value ?? "");
 }

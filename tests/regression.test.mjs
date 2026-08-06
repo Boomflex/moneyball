@@ -3,7 +3,7 @@ import fs from "node:fs";
 import { WORKBOOK_MODEL } from "../src/model.js";
 import { applyLeagueOverrides, resolveLeague } from "../src/league-overrides.js";
 import { analyzeImport, applySquadDivisionOverride, dominantDivisionForRows, inferImportRole, parseCsv } from "../src/importer.js";
-import { controlProfileForRow, percentileForStat, recalcRows } from "../src/scoring.js";
+import { percentileForStat, recalcRows } from "../src/scoring.js";
 
 const MODEL = applyLeagueOverrides(WORKBOOK_MODEL);
 
@@ -144,22 +144,6 @@ for (const role of MODEL.roles) {
   assert.equal(resolveLeague(role, "Northern Ireland Premiership").name, "NIFL Premiership", `${role.id} Northern Ireland Premiership alias should resolve to NIFL Premiership`);
 }
 
-const controlRole = MODEL.roles.find((role) => role.id === "Winger");
-const controlProfile = controlProfileForRow({
-  Division: "NIFL Premiership",
-  "Expected Assists Per 90": "0.30",
-  "Open Play Key Passes Per 90": "1.20",
-  "Goals Per 90": "0.40",
-  "Expected Goals Per 90": "0.35",
-  "Shots Per 90": "2.10",
-  "Pressures Won Per 90": "5.50",
-  "Pressures Attempted Per 90": "10.00",
-  "Possession Won Per 90": "6.20",
-  "Possession Lost Per 90": "9.00",
-  "Passes Attempted Per 90": "42.00",
-}, controlRole);
-assert.ok(Number.isFinite(controlProfile.controlRaw), "Control Score raw calculation should be finite when inputs are present");
-assert.equal(round1(controlProfile.controlCoverage * 100), 100, "Control Score should report full coverage when all inputs are present");
 
 console.log(`Regression checks passed for ${Object.keys(EXPORTS).length - skipped.length} available exports${skipped.length ? `; skipped missing fixtures: ${skipped.join(", ")}` : ""}.`);
 

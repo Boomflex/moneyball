@@ -1647,7 +1647,7 @@ function renderRoleSheets() {
   const sections = rolesWithRows().map((role) => {
     const rows = filteredPlayers().filter((item) => item.role === role.id);
     const statColumns = state.roleSheetMode === "detailed" ? allRoleStatColumns(role) : roleStatColumns(role, rows);
-    const columns = ["player", "division", "minutes", "age", "bestRole", "bestScore", "controlScore", ...statColumns.map(statColumnKey), "expectedValue", "actualValue", "valueRatio", "dealFlag"];
+    const columns = ["player", "division", "minutes", "age", "bestRole", "bestScore", ...statColumns.map(statColumnKey), "expectedValue", "actualValue", "valueRatio", "dealFlag"];
     const avg = mean(rows.map((item) => item.bestScore));
     const filterableColumns = columns.filter((col) => !["player", "division", "bestRole", "dealFlag"].includes(col));
     const fullRoleRows = roleSheetRows(rows, statColumns);
@@ -1721,35 +1721,6 @@ function renderModel() {
   renderShell(`
     <section class="model-layout">
       <section class="stack model-standards">${sourcePanel}${leagueSections}</section>
-      <section class="panel model-guide control-model-card">
-        <div class="panel-head"><div><span>Experimental lab</span><h2>Control Score Lab</h2></div></div>
-        <div class="guide-grid compact-guide">
-          <article class="guide-card">
-            <span>Creation</span>
-            <h2>xA quality</h2>
-            <p>xAssists multiplied by xAssists divided by open-play key passes, then scaled by 67.5.</p>
-            <small>Rewards higher-quality chance creation over pure pass volume.</small>
-          </article>
-          <article class="guide-card">
-            <span>Scoring</span>
-            <h2>Shot quality</h2>
-            <p>Goals multiplied by expected goals divided by shots, then scaled by 54.</p>
-            <small>Balances output with shooting efficiency.</small>
-          </article>
-          <article class="guide-card">
-            <span>Pressure</span>
-            <h2>Press efficiency</h2>
-            <p>Pressures won multiplied by pressures won divided by pressures attempted, then scaled by 2.23.</p>
-            <small>Requires pressure attempted data when available.</small>
-          </article>
-          <article class="guide-card">
-            <span>Possession</span>
-            <h2>Control adjustment</h2>
-            <p>Possession won is scaled, then the raw total is adjusted by possession lost rate and league strength.</p>
-            <small>Valid rows are normalised so the imported role average sits around 100.</small>
-          </article>
-        </div>
-      </section>
       <section class="panel model-guide">
         <div class="panel-head"><div><span>Workbook model</span><h2>Archetypes</h2></div></div>
         <div class="guide-grid compact-guide">
