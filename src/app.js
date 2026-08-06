@@ -1267,6 +1267,17 @@ function databaseScoreAuditRows(player) {
   }).sort((a, b) => Math.abs(b.contribution.value || 0) - Math.abs(a.contribution.value || 0));
 }
 
+const WINGER_PERCENTILE_REPLACEMENTS = new Map([
+  ["Assists Per 90", { header: "Pressures Completed Per 90" }],
+]);
+
+function percentileProfileStats(role, profile) {
+  return profile.stats.map((stat) => {
+    const replacement = role.id === "Winger" ? WINGER_PERCENTILE_REPLACEMENTS.get(stat.header) : null;
+    return replacement ? { ...stat, ...replacement } : stat;
+  });
+}
+
 function percentileMetricCategory(header) {
   const label = String(header || "").toLowerCase();
   if (/tackle|interception|pressure|block|clearance|header|save|prevented|allowed|mistake|possession won/.test(label)) return "defending";
@@ -1290,7 +1301,7 @@ function databasePercentileProfilePanel(player) {
   const rolePeers = peerPool.filter((item) => item.role === role.id);
   const benchmarkPeers = (state.benchmarkSquad?.players || []).filter((item) => item.role === role.id);
   const get = rowGetter(player.source);
-  const rows = [...profile.stats]
+  const rows = percentileProfileStats(role, profile)
     .sort((a, b) => b.weight - a.weight)
     .map((stat) => ({ stat, value: valueForStat(get, stat) }))
     .filter((item) => item.value !== null)

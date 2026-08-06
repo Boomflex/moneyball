@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { WORKBOOK_MODEL } from "../src/model.js";
 import { applyLeagueOverrides, resolveLeague } from "../src/league-overrides.js";
-import { analyzeImport, applySquadDivisionOverride, dominantDivisionForRows, inferImportRole, parseCsv } from "../src/importer.js";
-import { percentileForStat, recalcRows } from "../src/scoring.js";
+import { analyzeImport, applySquadDivisionOverride, dominantDivisionForRows, inferImportRole, parseCsv, rowGetter } from "../src/importer.js";
+import { percentileForStat, recalcRows, valueForStat } from "../src/scoring.js";
 
 const MODEL = applyLeagueOverrides(WORKBOOK_MODEL);
 
@@ -23,6 +23,11 @@ assert.ok(
   percentileForStat(percentilePlayers[0], { header: "Metric", direction: -1 }, percentileRole, percentilePlayers)
     > percentileForStat(percentilePlayers[2], { header: "Metric", direction: -1 }, percentileRole, percentilePlayers),
   "Lower-is-better metrics should invert percentile rank",
+);
+assert.equal(
+  valueForStat(rowGetter({ "Pres C/90": "1.8" }), { header: "Pressures Completed Per 90" }),
+  1.8,
+  "FM pressure completed shorthand should map to Pressures Completed Per 90",
 );
 
 const EXPORTS = {
