@@ -294,11 +294,11 @@ function pizzaMarkerPath(center, radius, startAngle, endAngle) {
 
 export function percentilePizza(rows, { centerLabel = "", centerValue = "" } = {}) {
   if (!rows.length) return `<div class="empty">No percentile metrics available.</div>`;
-  const size = 620;
+  const size = 720;
   const center = size / 2;
   const innerRadius = 48;
   const outerRadius = 178;
-  const labelRadius = 244;
+  const labelRadius = 286;
   const sliceAngle = (Math.PI * 2) / rows.length;
   const gap = Math.min(0.035, sliceAngle * 0.12);
   const grid = [25, 50, 75, 100].map((value) => {
