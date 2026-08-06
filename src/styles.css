@@ -2029,24 +2029,59 @@ tbody tr.selected-row:hover {
   background: linear-gradient(90deg, rgba(230, 100, 255, .24), rgba(255, 65, 100, .12));
 }
 
+.planner-table tbody tr.depth-risk-row {
+  background: linear-gradient(90deg, rgba(255, 65, 100, .13), rgba(230, 100, 255, .06));
+  box-shadow: inset 4px 0 0 rgba(255, 65, 100, .86);
+}
+
+.planner-table tbody tr.depth-risk-row:hover {
+  background: linear-gradient(90deg, rgba(255, 65, 100, .18), rgba(230, 100, 255, .1));
+}
+
 .planner-table {
-  min-width: 1540px;
+  min-width: 1760px;
 }
 
 .planner-table.no-benchmark {
-  min-width: 1150px;
+  min-width: 1480px;
 }
 
-.planner-table th:nth-child(n+2):nth-child(-n+6),
-.planner-table td:nth-child(n+2):nth-child(-n+6),
-.planner-table th:nth-child(n+9):nth-child(-n+10),
-.planner-table td:nth-child(n+9):nth-child(-n+10) {
+.planner-table.no-benchmark th:nth-child(3),
+.planner-table.no-benchmark td:nth-child(3),
+.planner-table.no-benchmark th:nth-child(6),
+.planner-table.no-benchmark td:nth-child(6),
+.planner-table.no-benchmark th:nth-child(8),
+.planner-table.no-benchmark td:nth-child(8),
+.planner-table.no-benchmark th:nth-child(9),
+.planner-table.no-benchmark td:nth-child(9),
+.planner-table.no-benchmark th:nth-child(10),
+.planner-table.no-benchmark td:nth-child(10),
+.planner-table.no-benchmark th:nth-child(12),
+.planner-table.no-benchmark td:nth-child(12),
+.planner-table:not(.no-benchmark) th:nth-child(3),
+.planner-table:not(.no-benchmark) td:nth-child(3),
+.planner-table:not(.no-benchmark) th:nth-child(6),
+.planner-table:not(.no-benchmark) td:nth-child(6),
+.planner-table:not(.no-benchmark) th:nth-child(8),
+.planner-table:not(.no-benchmark) td:nth-child(8),
+.planner-table:not(.no-benchmark) th:nth-child(9),
+.planner-table:not(.no-benchmark) td:nth-child(9),
+.planner-table:not(.no-benchmark) th:nth-child(10),
+.planner-table:not(.no-benchmark) td:nth-child(10),
+.planner-table:not(.no-benchmark) th:nth-child(12),
+.planner-table:not(.no-benchmark) td:nth-child(12),
+.planner-table:not(.no-benchmark) th:nth-child(13),
+.planner-table:not(.no-benchmark) td:nth-child(13),
+.planner-table:not(.no-benchmark) th:nth-child(15),
+.planner-table:not(.no-benchmark) td:nth-child(15) {
   text-align: right;
 }
 
 .planner-table td:nth-child(1),
+.planner-table td:nth-child(2),
+.planner-table td:nth-child(5),
 .planner-table td:nth-child(7),
-.planner-table td:nth-child(11) {
+.planner-table td:last-child {
   font-weight: 850;
 }
 

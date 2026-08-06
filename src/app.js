@@ -30,6 +30,10 @@ const SQUAD_STORAGE_KEY = "moneyball.squadBaseline.v1";
 const BENCHMARK_SQUAD_STORAGE_KEY = "moneyball.benchmarkSquad.v1";
 const DATABASE_STATUSES = ["New", "Watch", "Scout", "Saved", "Ignore"];
 const DATABASE_PRIORITIES = ["", "A", "B", "C"];
+const ROLE_DEPTH_TARGETS = { GK: 2, CB: 4, FB: 4, MID: 6, Winger: 4, Striker: 3 };
+const USABLE_DEPTH_DROP = 15;
+const BACKUP_DROP_WARN = 15;
+const BACKUP_DROP_BAD = 25;
 let initialStorageWarning = "";
 
 const model = applyLeagueOverrides(WORKBOOK_MODEL);
@@ -512,6 +516,40 @@ function scoreDelta(a, b) {
   return a && b ? a.bestScore - b.bestScore : null;
 }
 
+function depthTargetForRole(roleId) {
+  return ROLE_DEPTH_TARGETS[roleId] || 3;
+}
+
+function squadDepthRead(roleId, squad) {
+  const target = depthTargetForRole(roleId);
+  const incumbent = squad[0];
+  const backup = squad[1];
+  const floor = squad[squad.length - 1];
+  const depthDrop = incumbent && backup ? incumbent.bestScore - backup.bestScore : null;
+  const roleSpread = incumbent && floor && floor !== incumbent ? incumbent.bestScore - floor.bestScore : null;
+  const usableDepthCount = incumbent
+    ? squad.filter((player) => incumbent.bestScore - player.bestScore <= USABLE_DEPTH_DROP).length
+    : 0;
+  let status = "No baseline";
+  if (incumbent && !backup) status = "No cover";
+  else if (incumbent && depthDrop >= BACKUP_DROP_BAD) status = "Exposed";
+  else if (incumbent && (depthDrop >= BACKUP_DROP_WARN || usableDepthCount < target)) status = "Thin";
+  else if (incumbent) status = "Covered";
+  return { target, incumbent, backup, floor, depthDrop, roleSpread, usableDepthCount, status };
+}
+
+function depthRecommendation({ depth, candidate, candidateDepthGap, starterGap }) {
+  if (!depth.incumbent) return "Build baseline";
+  if (candidate && starterGap >= 5) return "Upgrade starter";
+  if (["No cover", "Exposed", "Thin"].includes(depth.status)) {
+    if (candidate && (!depth.backup || candidateDepthGap >= 3)) return "Shortlist backup";
+    if (candidate && candidateDepthGap >= -2) return "Scout as cover";
+    return "Find depth";
+  }
+  if (candidate && candidateDepthGap >= 5) return "Improve bench";
+  return "Covered";
+}
+
 function upgradeCall(candidate, incumbent) {
   if (!candidate) return "No candidates";
   if (!incumbent) return "Squad gap";
@@ -542,23 +580,33 @@ function squadPlannerRows() {
     const top = ranked[0];
     const squad = squadPlayersForRole(role.id);
     const benchmarkSquad = squadPlayersForRole(role.id, state.benchmarkSquad);
-    const incumbent = squad[0];
     const benchmark = benchmarkSquad[0];
+    const depth = squadDepthRead(role.id, squad);
     const saved = players.filter((item) => scoutRecord(item).status === "Saved").length;
     const scout = players.filter((item) => scoutRecord(item).status === "Scout").length;
     const watch = players.filter((item) => scoutRecord(item).status === "Watch").length;
     const greatValue = players.filter((item) => item.dealFlag === "Great value" || item.dealFlag === "FREE - bargain").length;
-    const scoreGap = scoreDelta(top, incumbent);
-    const action = upgradeCall(top, incumbent);
+    const scoreGap = scoreDelta(top, depth.incumbent);
+    const candidateDepthGap = top && depth.backup
+      ? top.bestScore - depth.backup.bestScore
+      : scoreDelta(top, depth.incumbent);
     return {
       role: role.id,
+      depthStatus: depth.status,
       squadCount: squad.length,
-      squadBest: incumbent?.player || "",
-      squadBestScore: incumbent?.bestScore ?? null,
+      depthTarget: depth.target,
+      usableDepth: depth.incumbent ? `${depth.usableDepthCount}/${depth.target}` : "0/0",
+      usableDepthCount: depth.usableDepthCount,
+      squadBest: depth.incumbent?.player || "",
+      squadBestScore: depth.incumbent?.bestScore ?? null,
+      backupPlayer: depth.backup?.player || "",
+      backupScore: depth.backup?.bestScore ?? null,
+      depthDrop: depth.depthDrop,
+      roleSpread: depth.roleSpread,
       benchmarkCount: benchmarkSquad.length,
       benchmarkBest: benchmark?.player || "",
       benchmarkScore: benchmark?.bestScore ?? null,
-      benchmarkGap: scoreDelta(incumbent, benchmark),
+      benchmarkGap: scoreDelta(depth.incumbent, benchmark),
       candidates: players.length,
       savedCount: saved,
       scoutCount: scout,
@@ -568,10 +616,12 @@ function squadPlannerRows() {
       bestRole: top?.bestRole || "",
       bestScore: top?.bestScore ?? null,
       scoreGap,
+      candidateDepthGap,
       candidateBenchmarkGap: scoreDelta(top, benchmark),
       avgScore: mean(players.map((item) => item.bestScore)),
-      action: benchmarkCall(top, incumbent, benchmark),
-      upgradeCall: action,
+      action: benchmarkCall(top, depth.incumbent, benchmark),
+      upgradeCall: upgradeCall(top, depth.incumbent),
+      recommendation: depthRecommendation({ depth, candidate: top, candidateDepthGap, starterGap: scoreGap }),
     };
   });
 }
@@ -1296,12 +1346,14 @@ function renderSquadPlanner() {
     ? ["At benchmark", "Strong benchmark closer", "Benchmark closer"]
     : ["Clear upgrade", "Possible upgrade", "Squad gap"];
   const opportunityCount = upgrades.filter((row) => positiveCalls.includes(row.upgradeCall)).length;
+  const depthRiskStatuses = ["No baseline", "No cover", "Exposed", "Thin"];
+  const depthRiskCount = rows.filter((row) => depthRiskStatuses.includes(row.depthStatus)).length;
   const upgradeColumns = hasBenchmark
     ? ["role", "squadPlayer", "squadScore", "benchmarkPlayer", "benchmarkScore", "benchmarkGap", "candidate", "candidateScore", "scoreGap", "candidateBenchmarkGap", "candidateDivision", "candidateValue", "dealFlag", "upgradeCall"]
     : ["role", "squadPlayer", "squadScore", "candidate", "candidateScore", "scoreGap", "candidateDivision", "candidateValue", "dealFlag", "upgradeCall"];
   const plannerColumns = hasBenchmark
-    ? ["role", "squadCount", "squadBest", "squadBestScore", "benchmarkCount", "benchmarkBest", "benchmarkScore", "benchmarkGap", "candidates", "topCandidate", "bestRole", "bestScore", "scoreGap", "candidateBenchmarkGap", "avgScore", "action"]
-    : ["role", "squadCount", "squadBest", "squadBestScore", "candidates", "topCandidate", "bestRole", "bestScore", "scoreGap", "avgScore", "action"];
+    ? ["role", "depthStatus", "squadCount", "usableDepth", "squadBest", "squadBestScore", "backupPlayer", "backupScore", "depthDrop", "roleSpread", "benchmarkBest", "benchmarkScore", "benchmarkGap", "topCandidate", "candidateDepthGap", "recommendation"]
+    : ["role", "depthStatus", "squadCount", "usableDepth", "squadBest", "squadBestScore", "backupPlayer", "backupScore", "depthDrop", "roleSpread", "topCandidate", "candidateDepthGap", "recommendation"];
   renderShell(`
     <section class="squad-baseline-grid">
       ${squadSnapshotCard({
@@ -1336,10 +1388,10 @@ function renderSquadPlanner() {
     </section>
     <section class="panel squad-planner-panel">
       <div class="panel-head">
-        <div><span>Role coverage</span><h2>${hasBenchmark ? "Squad Benchmark" : "Squad Overview"}</h2></div>
-        <strong>${state.players.length} recruitment / ${squad?.players.length || 0} yours${hasBenchmark ? ` / ${benchmark.players.length} benchmark` : ""}</strong>
+        <div><span>Squad depth</span><h2>${hasBenchmark ? "Depth vs Benchmark" : "Squad Depth"}</h2></div>
+        <strong>${depthRiskCount} depth alerts / ${state.players.length} recruitment / ${squad?.players.length || 0} yours${hasBenchmark ? ` / ${benchmark.players.length} benchmark` : ""}</strong>
       </div>
-      ${table(rows, plannerColumns, `planner-table${hasBenchmark ? "" : " no-benchmark"}`)}
+      ${table(rows, plannerColumns, `planner-table${hasBenchmark ? "" : " no-benchmark"}`, { rowClass: (row) => depthRiskStatuses.includes(row.depthStatus) ? "depth-risk-row" : "" })}
     </section>
   `, { showControls: false, showImportReport: false });
   bindTable();

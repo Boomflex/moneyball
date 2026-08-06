@@ -44,8 +44,8 @@ export function flagClass(value) {
 }
 
 export function upgradeClass(value) {
-  if (["At benchmark", "Strong benchmark closer", "Benchmark closer", "Clear upgrade", "Possible upgrade", "Squad gap"].includes(value)) return "flag good";
-  if (["Below benchmark", "No closer", "Depth only"].includes(value)) return "flag bad";
+  if (["At benchmark", "Strong benchmark closer", "Benchmark closer", "Clear upgrade", "Possible upgrade", "Squad gap", "Covered", "Upgrade starter", "Improve bench"].includes(value)) return "flag good";
+  if (["Below benchmark", "No closer", "Depth only", "No baseline", "No cover", "Exposed", "Find depth", "Build baseline"].includes(value)) return "flag bad";
   return "flag";
 }
 export function labelFor(col) {
@@ -70,7 +70,7 @@ export function labelFor(col) {
     scoutCount: "Scout",
     watchCount: "Watch",
     greatValueCount: "Value flags",
-    squadCount: "Your roles",
+    squadCount: "Entries",
     squadBest: "Your best",
     squadBestScore: "Your score",
     benchmarkCount: "Benchmark roles",
@@ -78,6 +78,16 @@ export function labelFor(col) {
     benchmarkScore: "Benchmark score",
     benchmarkPlayer: "Benchmark player",
     benchmarkGap: "Your vs benchmark",
+    depthStatus: "Depth status",
+    depthTarget: "Target depth",
+    usableDepth: "Usable depth",
+    usableDepthCount: "Usable depth",
+    backupPlayer: "Backup",
+    backupScore: "Backup score",
+    depthDrop: "Best to backup",
+    roleSpread: "Best to floor",
+    candidateDepthGap: "Candidate depth gap",
+    recommendation: "Recommendation",
     topCandidate: "Top candidate",
     squadPlayer: "Your player",
     squadScore: "Your score",
@@ -120,8 +130,8 @@ export function formatCell(row, col) {
   if (col === "notes") return notesCell(row, value);
   if (col.startsWith("stat:")) return formatStatCell(value);
   if (["actualValue", "expectedValue", "actualWage", "expectedWage", "candidateValue"].includes(col)) return value ? money.format(value) : "";
-  if (["bestScore", "totalVfm", "valueRatio", "wageRatio", "strength", "squadBestScore", "squadScore", "benchmarkScore", "candidateScore", "scoreGap", "benchmarkGap", "candidateBenchmarkGap", "avgScore"].includes(col)) return value === null || value === undefined ? "" : fmt(value);
-  if (["player", "dealFlag", "archetype", "upgradeCall"].includes(col)) return `<span class="${col === "dealFlag" ? flagClass(value) : col === "upgradeCall" ? upgradeClass(value) : ""}">${escapeHtml(value ?? "")}</span>`;
+  if (["bestScore", "totalVfm", "valueRatio", "wageRatio", "strength", "squadBestScore", "squadScore", "benchmarkScore", "candidateScore", "scoreGap", "benchmarkGap", "candidateBenchmarkGap", "avgScore", "backupScore", "depthDrop", "roleSpread", "candidateDepthGap", "usableDepthCount", "depthTarget"].includes(col)) return value === null || value === undefined ? "" : fmt(value);
+  if (["player", "dealFlag", "archetype", "upgradeCall", "action", "depthStatus", "recommendation"].includes(col)) return `<span class="${col === "dealFlag" ? flagClass(value) : ["upgradeCall", "action", "depthStatus", "recommendation"].includes(col) ? upgradeClass(value) : ""}">${escapeHtml(value ?? "")}</span>`;
   return escapeHtml(value ?? "");
 }
 
