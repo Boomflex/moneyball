@@ -65,6 +65,8 @@ export function labelFor(col) {
     priority: "Priority",
     notes: "Notes",
     modelRank: "Model rank",
+    goodLook: "Good look",
+    goodLookFlags: "Good flags",
     candidates: "Candidates",
     savedCount: "Saved",
     scoutCount: "Scout",

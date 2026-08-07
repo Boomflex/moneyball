@@ -21,6 +21,7 @@ import {
   similarPlayers,
   statColumnKey,
 } from "./scoring.js";
+import { goodLookBand, goodLookSummary } from "./good-look.js";
 import { csvCell, escapeHtml, mean } from "./utils.js";
 import { fmt, formatStatValue, importReportCard, labelFor, metricCompare, percentilePizza, playerSelectors, radar, table } from "./ui.js";
 
@@ -431,8 +432,49 @@ function databasePassesScoutFilters(player) {
   return statusMatch && priorityMatch && dealMatch;
 }
 
+function goodLookClass(label) {
+  return `good-look-${String(label || "none").toLowerCase()}`;
+}
+
+function goodLookBadgeHtml(band) {
+  if (!band) return '<span class="muted-cell">No benchmark</span>';
+  return `<span class="flag good-look-badge ${goodLookClass(band.label)}">${escapeHtml(band.label)} / P${band.percentile}</span>`;
+}
+
+function goodLookMetricItems(player) {
+  if (!player) return [];
+  const role = roleById(roles, player.role);
+  const profile = role ? scoreProfileForPlayer(player, role) : null;
+  if (!role || !profile) return [];
+  const get = rowGetter(player.source);
+  return profile.stats
+    .map((stat) => {
+      const value = valueForStat(get, stat);
+      const band = goodLookBand({ roleId: role.id, header: stat.header, value });
+      return { stat, value, band, label: labelFor(statColumnKey(stat)) };
+    })
+    .filter((item) => item.band);
+}
+
+function goodLookFlagsCell(player) {
+  const items = goodLookMetricItems(player);
+  if (!items.length) return { value: 0, __html: '<span class="muted-cell">No benchmark</span>' };
+  const counts = goodLookSummary(items);
+  const positives = items
+    .filter((item) => item.band.percentile >= 60)
+    .sort((a, b) => b.band.percentile - a.band.percentile)
+    .slice(0, 2);
+  const value = counts.Elite * 2 + counts.Good;
+  const summary = counts.Elite ? `${counts.Elite} elite` : counts.Good ? `${counts.Good} good` : "No flags";
+  const label = counts.Elite ? "Elite" : counts.Good ? "Good" : "Average";
+  const detail = positives.length ? positives.map((item) => item.label).join(", ") : `${counts.Average} avg / ${counts.Poor + counts.Below} low`;
+  return {
+    value,
+    __html: `<div class="good-look-flags"><span class="flag good-look-badge ${goodLookClass(label)}">${escapeHtml(summary)}</span><small>${escapeHtml(detail)}</small></div>`,
+  };
+}
 function databaseRows(players) {
-  return players;
+  return players.map((player) => ({ ...player, goodLookFlags: goodLookFlagsCell(player) }));
 }
 
 function databaseCompactSummary(players, visiblePlayers) {
@@ -1031,6 +1073,7 @@ function databaseScoreAuditRows(player) {
   const leagueStrength = Number(league.data?.strength) || 35;
   return profile.stats.map((stat) => {
     const value = valueForStat(get, stat);
+    const band = goodLookBand({ roleId: role.id, header: stat.header, value });
     const z = value === null || !stat.stdev ? null : stat.direction * ((value - stat.mean) / stat.stdev);
     const contribution = z === null ? null : (stat.weight * z / profile.denominator) * (leagueStrength / 55) * 10;
     return {
@@ -1042,6 +1085,10 @@ function databaseScoreAuditRows(player) {
       benchmark: {
         value: stat.mean,
         __html: escapeHtml(formatStatValue({ label: stat.header, value: stat.mean })),
+      },
+      goodLook: {
+        value: band?.percentile ?? null,
+        __html: goodLookBadgeHtml(band),
       },
       weight: stat.weight,
       contribution: {
@@ -1142,7 +1189,7 @@ function databaseScoreAuditPanel(player) {
       <article><span>Deal</span><strong>${escapeHtml(player.dealFlag || "-")}</strong></article>
     </section>
     <p class="lede">${escapeHtml(profile?.label || "Workbook score")} using ${escapeHtml(leagueNote)} league strength. Contributions show each metric's estimated effect on the final score.</p>
-    ${table(rows, ["metric", "value", "benchmark", "weight", "contribution"], "audit-table", { sortable: false })}
+    ${table(rows, ["metric", "value", "benchmark", "goodLook", "weight", "contribution"], "audit-table", { sortable: false })}
   </section>`;
 }
 function renderPlayerDatabase() {
@@ -1158,14 +1205,14 @@ function renderPlayerDatabase() {
   if (state.databaseDeal !== "All" && !dealOptions.includes(state.databaseDeal)) state.databaseDeal = "All";
 
   const databasePlayers = divisionPlayers.filter(databasePassesScoutFilters);
-  const columns = ["player", "bestRole", "matchedRoles", "division", "age", "minutes", "bestScore", "totalVfm", "valueRatio", "actualValue", "actualWage", "dealFlag", "scoutStatus", "priority", "notes"];
+  const columns = ["player", "bestRole", "matchedRoles", "division", "age", "minutes", "bestScore", "goodLookFlags", "totalVfm", "valueRatio", "actualValue", "actualWage", "dealFlag", "scoutStatus", "priority", "notes"];
   const fullRows = databaseRows(databasePlayers);
   const filteredRows = applyColumnFilters(fullRows, columns, state.databaseFilters);
   const rows = sortedRows(filteredRows);
   const selectedAudit = rows.find((item) => item.id === state.databaseAuditId) || rows[0] || null;
   state.databaseAuditId = selectedAudit?.id || null;
   const filterCount = activeDatabaseFilterCount();
-  const filterableColumns = ["age", "minutes", "bestScore", "totalVfm", "valueRatio", "actualValue", "actualWage"];
+  const filterableColumns = ["age", "minutes", "bestScore", "goodLookFlags", "totalVfm", "valueRatio", "actualValue", "actualWage"];
   const noteCount = basePlayers.filter((player) => player.notes).length;
 
   renderShell(`

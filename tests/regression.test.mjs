@@ -4,6 +4,7 @@ import { WORKBOOK_MODEL } from "../src/model.js";
 import { applyLeagueOverrides, resolveLeague } from "../src/league-overrides.js";
 import { analyzeImport, applySquadDivisionOverride, dominantDivisionForRows, inferImportRole, parseCsv, rowGetter } from "../src/importer.js";
 import { percentileForStat, recalcRows, valueForStat } from "../src/scoring.js";
+import { goodLookBand } from "../src/good-look.js";
 
 const MODEL = applyLeagueOverrides(WORKBOOK_MODEL);
 
@@ -28,6 +29,16 @@ assert.equal(
   valueForStat(rowGetter({ "Pres C/90": "1.8" }), { header: "Pressures Completed Per 90" }),
   1.8,
   "FM pressure completed shorthand should map to Pressures Completed Per 90",
+);
+assert.equal(
+  goodLookBand({ roleId: "Striker", header: "Goals Per 90", value: 0.5 })?.label,
+  "Elite",
+  "Forward goals above the Mustermann 80th percentile should be elite",
+);
+assert.equal(
+  goodLookBand({ roleId: "CB", header: "Possession Lost Per 90", value: 13 })?.label,
+  "Below",
+  "Lower-is-better Mustermann bands should flag poor possession security",
 );
 
 const EXPORTS = {

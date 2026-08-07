@@ -927,6 +927,50 @@ tbody tr.selected-row:hover {
   border-color: rgba(255, 65, 100, .42);
   background: rgba(255, 65, 100, .08);
 }
+.good-look-badge {
+  white-space: nowrap;
+}
+
+.good-look-elite {
+  color: var(--green);
+  border-color: rgba(70, 215, 167, .5);
+  background: rgba(70, 215, 167, .1);
+}
+
+.good-look-good {
+  color: var(--accent-2);
+  border-color: rgba(175, 120, 255, .5);
+  background: rgba(175, 120, 255, .1);
+}
+
+.good-look-average {
+  color: var(--muted);
+  border-color: rgba(210, 200, 245, .28);
+  background: rgba(210, 200, 245, .04);
+}
+
+.good-look-poor,
+.good-look-below {
+  color: var(--red);
+  border-color: rgba(255, 65, 100, .42);
+  background: rgba(255, 65, 100, .08);
+}
+
+.good-look-flags {
+  display: grid;
+  gap: 3px;
+  justify-items: start;
+}
+
+.good-look-flags small {
+  max-width: 145px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .compare-grid {
   display: grid;
@@ -1827,8 +1871,20 @@ tbody tr.selected-row:hover {
   vertical-align: middle;
 }
 
-.database-table th:nth-child(n+8),
-.database-table td:nth-child(n+8) {
+.database-table th:nth-child(5),
+.database-table td:nth-child(5),
+.database-table th:nth-child(6),
+.database-table td:nth-child(6),
+.database-table th:nth-child(7),
+.database-table td:nth-child(7),
+.database-table th:nth-child(9),
+.database-table td:nth-child(9),
+.database-table th:nth-child(10),
+.database-table td:nth-child(10),
+.database-table th:nth-child(11),
+.database-table td:nth-child(11),
+.database-table th:nth-child(12),
+.database-table td:nth-child(12) {
   text-align: right;
 }
 
@@ -1885,7 +1941,7 @@ tbody tr.selected-row:hover {
 }
 
 .database-table {
-  min-width: 1640px;
+  min-width: 1740px;
 }
 
 .database-table td:nth-child(3),
@@ -1894,8 +1950,8 @@ tbody tr.selected-row:hover {
   font-weight: 850;
 }
 
-.database-table th:nth-child(15),
-.database-table td:nth-child(15) {
+.database-table th:nth-child(16),
+.database-table td:nth-child(16) {
   min-width: 220px;
   text-align: left;
 }
