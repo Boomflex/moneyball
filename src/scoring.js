@@ -1,4 +1,4 @@
-import { rowGetter, safeNumber } from "./importer.js";
+import { isNotForSaleValue, rowGetter, safeNumber } from "./importer.js";
 import { resolveLeague } from "./league-overrides.js";
 import { clamp, mean, normalise, roleIdsFromPositionText, stdev } from "./utils.js";
 
@@ -77,6 +77,7 @@ export function scoreRole(row, role, rowIndex = 0) {
   const best = validScores.reduce((top, item) => item.score > top.score ? item : top, validScores[0]);
   const playerName = get("Player Name") || get("Player") || get("Name");
   const age = safeNumber(get("Age"));
+  const rawActualValue = get("Actual Value") || get("Value");
   const actualValue = safeNumber(get("Actual Value")) ?? safeNumber(get("Value"));
   const actualWage = safeNumber(get("Actual Wage")) ?? safeNumber(get("Wage"));
   const resolvedLeague = resolveLeague(role, get("Division"));
@@ -107,6 +108,7 @@ export function scoreRole(row, role, rowIndex = 0) {
     bestScore: best.score,
     coverage: best.coverage,
     actualValue,
+    valueStatus: isNotForSaleValue(rawActualValue) ? "Not For Sale" : "",
     actualWage,
     expectedValue,
     expectedWage,
@@ -179,6 +181,7 @@ export function recalcRows({ rows, roles, importRole, importRoleLocked }) {
 
 export function dealFlag(item, role) {
   if (!item.bestScore || item.age === null) return "";
+  if (item.valueStatus === "Not For Sale") return "Not For Sale";
   if (!item.actualValue && role.freeAgentThreshold && item.bestScore >= role.freeAgentThreshold) return "FREE - bargain";
   if (!item.actualValue) return "Free agent";
   if (!item.expectedValue) return "No league data";

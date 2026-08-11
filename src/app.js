@@ -408,7 +408,7 @@ function bestScoutRecord(entries) {
 
 function bestDealFlag(entries) {
   const flags = entries.map((entry) => entry.dealFlag).filter(Boolean);
-  for (const preferred of ["FREE - bargain", "Great value", "Fair price", "Free agent", "No league data", "Overpriced"]) {
+  for (const preferred of ["Not For Sale", "FREE - bargain", "Great value", "Fair price", "Free agent", "No league data", "Overpriced"]) {
     if (flags.includes(preferred)) return preferred;
   }
   return flags[0] || "";

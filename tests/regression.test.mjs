@@ -3,7 +3,7 @@ import fs from "node:fs";
 import { WORKBOOK_MODEL } from "../src/model.js";
 import { applyLeagueOverrides, resolveLeague } from "../src/league-overrides.js";
 import { analyzeImport, applySquadDivisionOverride, dominantDivisionForRows, inferImportRole, parseCsv, rowGetter } from "../src/importer.js";
-import { percentileForStat, recalcRows, valueForStat } from "../src/scoring.js";
+import { dealFlag, percentileForStat, recalcRows, valueForStat } from "../src/scoring.js";
 import { goodLookBand } from "../src/good-look.js";
 
 const MODEL = applyLeagueOverrides(WORKBOOK_MODEL);
@@ -39,6 +39,11 @@ assert.equal(
   goodLookBand({ roleId: "CB", header: "Possession Lost Per 90", value: 13 })?.label,
   "Below",
   "Lower-is-better Mustermann bands should flag poor possession security",
+);
+assert.equal(
+  dealFlag({ bestScore: 99, age: 21, actualValue: null, valueStatus: "Not For Sale" }, { freeAgentThreshold: 1 }),
+  "Not For Sale",
+  "Not for sale exports should not be treated as free-agent bargains",
 );
 
 const EXPORTS = {

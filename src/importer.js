@@ -76,6 +76,8 @@ export const safeNumber = (value) => {
   return parts[0] ?? null;
 };
 
+export const isNotForSaleValue = (value) => /^not for sale$/i.test(String(value ?? "").trim());
+
 export function parseCompactNumber(value) {
   const text = String(value)
     .replace(/[\u00a3\u00c2,$]/g, "")
