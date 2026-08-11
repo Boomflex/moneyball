@@ -1810,6 +1810,67 @@ tbody tr.selected-row:hover {
   border-color: rgba(175, 120, 255, .78);
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
 }
+.workspace-role-fit {
+  gap: 14px;
+}
+
+.role-fit-grid {
+  display: grid;
+  grid-template-columns: minmax(360px, .8fr) minmax(520px, 1fr);
+  gap: 14px;
+  align-items: stretch;
+}
+
+.role-fit-hero {
+  border-color: rgba(70, 215, 167, .28);
+  background:
+    linear-gradient(135deg, rgba(70, 215, 167, .08), transparent 40%),
+    linear-gradient(90deg, rgba(255, 90, 40, .06), transparent 48%),
+    rgba(9, 13, 29, .9);
+}
+
+.role-fit-controls {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 14px;
+}
+
+.embedded-controls {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  backdrop-filter: none;
+}
+
+.embedded-controls label {
+  min-width: 150px;
+  flex: 1 1 180px;
+}
+
+.role-fit-notice {
+  justify-content: start;
+}
+
+.role-fit-results {
+  padding: 14px;
+}
+
+.role-fit-table {
+  min-width: 1040px;
+}
+
+.role-fit-table th:nth-child(n+6),
+.role-fit-table td:nth-child(n+6),
+.role-fit-table th:nth-child(1),
+.role-fit-table td:nth-child(1) {
+  text-align: right;
+}
+
+.role-fit-table td:nth-child(2),
+.role-fit-table td:nth-child(3) {
+  font-weight: 850;
+}
 .database-tools {
   display: grid;
   grid-template-columns: minmax(180px, .7fr) minmax(260px, 1fr) auto;
@@ -2168,6 +2229,7 @@ tbody tr.selected-row:hover {
   .database-tools,
   .database-utility-grid,
   .model-layout,
+  .role-fit-grid,
   .import-hero,
   .import-grid {
     grid-template-columns: 1fr;

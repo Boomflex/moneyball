@@ -21,6 +21,15 @@ import {
   similarPlayers,
   statColumnKey,
 } from "./scoring.js";
+import {
+  ROLE_FIT_AREAS,
+  ROLE_FIT_PHASES,
+  ROLE_FIT_ROLE_NAMES,
+  attributeColumnsForCsv,
+  calculateRoleFitRows,
+  roleFitImportReport,
+  topRoleFitPerPlayer,
+} from "./role-fit.js";
 import { goodLookBand, goodLookSummary } from "./good-look.js";
 import { csvCell, escapeHtml, mean } from "./utils.js";
 import { fmt, formatStatValue, importReportCard, labelFor, metricCompare, percentilePizza, playerSelectors, radar, table } from "./ui.js";
@@ -78,6 +87,14 @@ const state = {
   databaseSavedView: "",
   databaseAuditId: null,
   leaderStat: "",
+  roleFitRows: [],
+  roleFitReport: null,
+  roleFitPhase: "All",
+  roleFitArea: "All",
+  roleFitRole: "All",
+  roleFitSearch: "",
+  roleFitSelectedPlayer: "",
+  roleFitView: "Best roles",
   storageWarning: initialStorageWarning,
 };
 
@@ -87,6 +104,7 @@ const tabs = [
   { id: "Database", label: "Recruitment" },
   { id: "Compare", label: "Compare" },
   { id: "Squad Planner", label: "Squad" },
+  { id: "Role Fit", label: "Role Fit" },
   { id: "Model", label: "Model" },
 ];
 
@@ -1055,6 +1073,167 @@ function importFile(file) {
   reader.readAsText(file);
 }
 
+function setRoleFitRows(rows) {
+  state.roleFitRows = calculateRoleFitRows(rows);
+  state.roleFitReport = roleFitImportReport(rows);
+  state.roleFitSelectedPlayer = topRoleFitPerPlayer(state.roleFitRows)[0]?.player || "";
+  state.roleFitPhase = "All";
+  state.roleFitArea = "All";
+  state.roleFitRole = "All";
+  state.roleFitSearch = "";
+  state.roleFitView = "Best roles";
+  state.activeTab = "Role Fit";
+  render();
+}
+
+function roleFitFilteredRows() {
+  const q = state.roleFitSearch.trim().toLowerCase();
+  return state.roleFitRows.filter((row) => {
+    const phaseMatch = state.roleFitPhase === "All" || row.phase === state.roleFitPhase;
+    const areaMatch = state.roleFitArea === "All" || row.area === state.roleFitArea;
+    const roleMatch = state.roleFitRole === "All" || row.roleFit === state.roleFitRole;
+    const searchMatch = !q || [row.player, row.bestPos, row.roleFit, row.phase, row.area].join(" ").toLowerCase().includes(q);
+    return phaseMatch && areaMatch && roleMatch && searchMatch;
+  });
+}
+
+function roleFitBestRows(rows = roleFitFilteredRows()) {
+  return topRoleFitPerPlayer(rows)
+    .sort((a, b) => b.score - a.score || a.player.localeCompare(b.player))
+    .map((row, index) => ({ ...row, rank: index + 1 }));
+}
+
+function roleFitSelectedRows(rows = roleFitFilteredRows()) {
+  const players = new Set(rows.map((row) => row.player));
+  const player = players.has(state.roleFitSelectedPlayer) ? state.roleFitSelectedPlayer : roleFitBestRows(rows)[0]?.player || "";
+  return rows
+    .filter((row) => row.player === player)
+    .sort((a, b) => b.score - a.score || a.rank - b.rank);
+}
+
+function roleFitSummaryCards(rows, bestRows) {
+  const report = state.roleFitReport;
+  const coverage = Math.round((report?.coverage || 0) * 100);
+  const avg = mean(bestRows.map((row) => row.score));
+  return `<section class="stats role-fit-stats">
+    <article><span>Imported rows</span><strong>${report?.rowCount || 0}</strong></article>
+    <article><span>Outfield</span><strong>${report?.outfieldCount || 0}</strong></article>
+    <article><span>Attr coverage</span><strong>${coverage}%</strong></article>
+    <article><span>Avg best fit</span><strong>${fmt(avg)}</strong></article>
+  </section>
+  ${report?.missing?.length ? `<section class="notice role-fit-notice"><strong>Missing attrs</strong><span>${escapeHtml(report.missing.slice(0, 12).join(", "))}${report.missing.length > 12 ? "..." : ""}</span></section>` : ""}`;
+}
+
+function roleFitOptions(options, selected) {
+  return options.map((option) => `<option value="${escapeHtml(option)}" ${option === selected ? "selected" : ""}>${escapeHtml(option)}</option>`).join("");
+}
+
+function renderRoleFit() {
+  const rows = roleFitFilteredRows();
+  const bestRows = roleFitBestRows(rows);
+  const selectedRows = roleFitSelectedRows(rows);
+  const players = [...new Set(rows.map((row) => row.player))].sort((a, b) => a.localeCompare(b));
+  const selectedPlayer = state.roleFitSelectedPlayer || players[0] || "";
+  const columns = state.roleFitView === "Selected player"
+    ? ["rank", "roleFit", "phase", "area", "score", "keyScore", "preferredScore", "missing"]
+    : state.roleFitView === "All scores"
+      ? ["player", "bestPos", "roleFit", "phase", "area", "score", "rank", "keyScore", "preferredScore", "missing"]
+      : ["rank", "player", "bestPos", "roleFit", "phase", "area", "score", "keyScore", "preferredScore", "missing"];
+  const displayRows = state.roleFitView === "Selected player" ? selectedRows : state.roleFitView === "All scores" ? rows.sort((a, b) => b.score - a.score) : bestRows;
+
+  renderShell(`
+    <section class="import-hero role-fit-hero">
+      <div class="hero-copy">
+        <span>Attributes tool</span>
+        <h1>Role Fit, separate from Moneyball.</h1>
+        <p>This uses visible FM attributes to find tactical-role fits. It does not affect the stats, value, squad, or recruitment scores.</p>
+      </div>
+      <div class="hero-metrics" aria-label="Role fit coverage">
+        <article><span>Roles</span><strong>${ROLE_FIT_ROLE_NAMES.length}</strong></article>
+        <article><span>Phases</span><strong>2</strong></article>
+        <article><span>Scale</span><strong>1-20</strong></article>
+      </div>
+    </section>
+    <section class="role-fit-grid">
+      <section class="dropzone" id="roleFitDropzone">
+        <div class="upload-icon"><span>CSV</span></div>
+        <div>
+          <h2>Drop attributes export</h2>
+          <p>Use an FM player search or squad view with Player, Best Pos, and outfield attributes.</p>
+        </div>
+        <input class="sr-only" id="roleFitFileInput" type="file" accept=".csv,text/csv" />
+        <label class="file-picker" for="roleFitFileInput">Browse attributes</label>
+        <small id="roleFitFileStatus">No file selected</small>
+      </section>
+      <section class="panel role-fit-controls">
+        <div class="panel-head compact"><div><span>Attribute model</span><h2>Filters</h2></div><button class="ghost" id="downloadRoleFitTemplate" type="button">CSV template</button></div>
+        <div class="controls embedded-controls">
+          <label>Phase<select id="roleFitPhase">${roleFitOptions(ROLE_FIT_PHASES, state.roleFitPhase)}</select></label>
+          <label>Area<select id="roleFitArea">${roleFitOptions(ROLE_FIT_AREAS, state.roleFitArea)}</select></label>
+          <label>Role<select id="roleFitRole">${roleFitOptions(["All", ...ROLE_FIT_ROLE_NAMES], state.roleFitRole)}</select></label>
+          <label>View<select id="roleFitView">${roleFitOptions(["Best roles", "Selected player", "All scores"], state.roleFitView)}</select></label>
+          <label>Search<input id="roleFitSearch" type="search" value="${escapeHtml(state.roleFitSearch)}" placeholder="Player, role, position" /></label>
+          <label>Player<select id="roleFitSelectedPlayer">${players.map((player) => `<option value="${escapeHtml(player)}" ${player === selectedPlayer ? "selected" : ""}>${escapeHtml(player)}</option>`).join("")}</select></label>
+        </div>
+      </section>
+    </section>
+    ${state.roleFitRows.length ? roleFitSummaryCards(rows, bestRows) : ""}
+    <section class="panel role-fit-results">
+      <div class="panel-head">
+        <div><span>${escapeHtml(state.roleFitView)}</span><h2>Attribute Role Fit</h2></div>
+        <div class="database-actions"><button class="ghost" id="exportRoleFit" type="button" ${displayRows.length ? "" : "disabled"}>Export CSV</button></div>
+      </div>
+      ${state.roleFitRows.length ? table(displayRows, columns, "role-fit-table", { sortable: false }) : `<div class="empty">Upload an attributes CSV to calculate role-fit scores.</div>`}
+    </section>
+  `, { showControls: false, showImportReport: false, workspaceClass: "role-fit" });
+  bindRoleFit();
+  bindTable();
+}
+
+function importRoleFitFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => setRoleFitRows(parseCsv(String(reader.result)));
+  reader.readAsText(file);
+}
+
+function bindRoleFit() {
+  const fileInput = app.querySelector("#roleFitFileInput");
+  const dropzone = app.querySelector("#roleFitDropzone");
+  fileInput?.addEventListener("change", () => {
+    const file = fileInput.files[0];
+    const status = app.querySelector("#roleFitFileStatus");
+    if (status) status.textContent = file?.name || "No file selected";
+    importRoleFitFile(file);
+  });
+  dropzone?.addEventListener("dragover", (event) => { event.preventDefault(); dropzone.classList.add("dragging"); });
+  dropzone?.addEventListener("dragleave", () => dropzone.classList.remove("dragging"));
+  dropzone?.addEventListener("drop", (event) => {
+    event.preventDefault();
+    dropzone.classList.remove("dragging");
+    const file = event.dataTransfer.files[0];
+    const status = app.querySelector("#roleFitFileStatus");
+    if (status) status.textContent = file?.name || "No file selected";
+    importRoleFitFile(file);
+  });
+  app.querySelector("#roleFitPhase")?.addEventListener("change", (event) => { state.roleFitPhase = event.target.value; render(); });
+  app.querySelector("#roleFitArea")?.addEventListener("change", (event) => { state.roleFitArea = event.target.value; render(); });
+  app.querySelector("#roleFitRole")?.addEventListener("change", (event) => { state.roleFitRole = event.target.value; render(); });
+  app.querySelector("#roleFitView")?.addEventListener("change", (event) => { state.roleFitView = event.target.value; render(); });
+  app.querySelector("#roleFitSelectedPlayer")?.addEventListener("change", (event) => { state.roleFitSelectedPlayer = event.target.value; render(); });
+  app.querySelector("#roleFitSearch")?.addEventListener("input", (event) => {
+    const caret = event.target.selectionStart;
+    state.roleFitSearch = event.target.value;
+    render();
+    restoreInputFocus("#roleFitSearch", caret);
+  });
+  app.querySelector("#downloadRoleFitTemplate")?.addEventListener("click", () => download("role-fit-attributes-template.csv", attributeColumnsForCsv().map(csvCell).join(",")));
+  app.querySelector("#exportRoleFit")?.addEventListener("click", () => {
+    const rows = state.roleFitView === "Selected player" ? roleFitSelectedRows() : state.roleFitView === "All scores" ? roleFitFilteredRows() : roleFitBestRows();
+    download("role-fit-scores.csv", toCsvColumns(rows, ["player", "bestPos", "roleFit", "phase", "area", "score", "rank", "keyScore", "preferredScore", "missing"]));
+  });
+}
+
 
 function rolesWithRows() {
   if (state.roleFilter !== "All") return [roleById(roles, state.roleFilter)].filter(Boolean);
@@ -1658,6 +1837,7 @@ function render() {
   else if (state.activeTab === "Role Sheets") renderRoleSheets();
   else if (state.activeTab === "Compare") renderCompare();
   else if (state.activeTab === "Squad Planner") renderSquadPlanner();
+  else if (state.activeTab === "Role Fit") renderRoleFit();
   else renderModel();
 }
 render();
