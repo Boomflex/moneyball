@@ -67,6 +67,7 @@ const state = {
   importRole: null,
   importRoleLocked: false,
   importReport: null,
+  leagueFallback: "",
   showEmptyRoles: false,
   roleSheetMode: "simple",
   roleSheetFilters: {},
@@ -115,11 +116,8 @@ function setTab(tab) {
 
 function setRows(rows) {
   state.rows = rows;
-  const importRole = inferImportRole(rows, roles);
-  state.importRole = importRole.id;
-  state.importRoleLocked = importRole.locked;
-  state.importReport = analyzeImport(rows, roles, importRole);
-  state.players = recalcRows({ rows, roles, importRole: state.importRole, importRoleLocked: state.importRoleLocked });
+  state.leagueFallback = "";
+  refreshRecruitmentScores();
   state.selectedA = state.players[0] ? `recruit:${state.players[0].id}` : null;
   state.selectedB = state.players[1] ? `recruit:${state.players[1].id}` : null;
   state.sortKey = "totalVfm";
@@ -133,6 +131,20 @@ function setRows(rows) {
   state.databaseAuditId = null;
   state.activeTab = "Database";
   render();
+}
+
+function refreshRecruitmentScores() {
+  const importRole = inferImportRole(state.rows, roles);
+  state.importRole = importRole.id;
+  state.importRoleLocked = importRole.locked;
+  state.importReport = analyzeImport(state.rows, roles, importRole, state.leagueFallback);
+  state.players = recalcRows({
+    rows: state.rows,
+    roles,
+    importRole: state.importRole,
+    importRoleLocked: state.importRoleLocked,
+    leagueFallback: state.leagueFallback,
+  });
 }
 
 function matchesPlayerFilters(item) {
@@ -877,6 +889,36 @@ function storageNotice() {
   </section>`;
 }
 
+function leagueFallbackOptions() {
+  const names = [...new Set(roles.flatMap((role) => Object.keys(role.leagues || {})))].sort((a, b) => a.localeCompare(b));
+  const preferred = [
+    "English Premier Division",
+    "Sky Bet Championship",
+    "Sky Bet League One",
+    "Sky Bet League Two",
+    "Vanarama National League",
+    "Vanarama National League North/South",
+  ].filter((name) => names.includes(name));
+  return [...preferred, ...names.filter((name) => !preferred.includes(name))];
+}
+
+function leagueFallbackPanel() {
+  const unmatched = state.importReport?.unmatchedDivisions || [];
+  if (!unmatched.length) return "";
+  const options = leagueFallbackOptions();
+  const unmatchedText = unmatched.slice(0, 8).map((item) => `${item.division} (${item.count})`).join(", ");
+  return `<section class="notice league-fallback-panel" role="status">
+    <strong>${unmatched.length} unmatched division${unmatched.length === 1 ? "" : "s"}</strong>
+    <span>${escapeHtml(unmatchedText)}${unmatched.length > 8 ? "..." : ""}</span>
+    <label>Fallback baseline
+      <select id="leagueFallback">
+        <option value="" ${state.leagueFallback ? "" : "selected"}>Keep as No league data</option>
+        ${options.map((name) => `<option value="${escapeHtml(name)}" ${state.leagueFallback === name ? "selected" : ""}>${escapeHtml(name)}</option>`).join("")}
+      </select>
+    </label>
+  </section>`;
+}
+
 function renderShell(content, options = {}) {
   const showControls = options.showControls ?? state.activeTab !== "Import";
   const showImportReport = options.showImportReport ?? state.activeTab !== "Import";
@@ -900,6 +942,7 @@ function renderShell(content, options = {}) {
       ${storageNotice()}
       ${showControls ? controls() : ""}
       ${showImportReport ? importReportCard(state.importReport) : ""}
+      ${showImportReport ? leagueFallbackPanel() : ""}
       ${content}
     </main>
   `;
@@ -977,6 +1020,12 @@ function bindGlobal() {
   app.querySelector("#roleSheetSimple")?.addEventListener("click", () => { state.roleSheetMode = "simple"; state.openRoleSheetFilter = null; render(); });
   app.querySelector("#roleSheetDetailed")?.addEventListener("click", () => { state.roleSheetMode = "detailed"; state.openRoleSheetFilter = null; render(); });
   app.querySelector("#clearRoleSheetFilters")?.addEventListener("click", () => { state.roleSheetFilters = {}; state.openRoleSheetFilter = null; render(); });
+  app.querySelector("#leagueFallback")?.addEventListener("change", (event) => {
+    state.leagueFallback = event.target.value;
+    refreshRecruitmentScores();
+    state.databaseAuditId = null;
+    render();
+  });
 }
 
 function bindSlider(selector, update) {
@@ -1353,9 +1402,9 @@ function databaseScoreAuditPanel(player) {
   const profile = role ? scoreProfileForPlayer(player, role) : null;
   const rows = databaseScoreAuditRows(player).slice(0, 10);
   const get = rowGetter(player.source);
-  const league = role ? resolveLeague(role, get("Division")) : null;
+  const league = role ? resolveLeague(role, get("Division"), state.leagueFallback) : null;
   const coverage = Number.isFinite(player.coverage) ? `${fmt(player.coverage * 100)}%` : "";
-  const leagueNote = league?.aliasFrom ? `${league.aliasFrom} -> ${league.name}` : league?.name || player.division;
+  const leagueNote = league?.fallback ? `${league.fallbackFrom} scored as ${league.name}` : league?.aliasFrom ? `${league.aliasFrom} -> ${league.name}` : league?.name || player.division;
   return `<section class="panel score-audit-panel">
     <div class="panel-head">
       <div><span>Workbook score audit</span><h2>${escapeHtml(player.player)}</h2></div>
@@ -1384,7 +1433,7 @@ function renderPlayerDatabase() {
   if (state.databaseDeal !== "All" && !dealOptions.includes(state.databaseDeal)) state.databaseDeal = "All";
 
   const databasePlayers = divisionPlayers.filter(databasePassesScoutFilters);
-  const columns = ["player", "bestRole", "matchedRoles", "division", "age", "minutes", "bestScore", "goodLookFlags", "totalVfm", "valueRatio", "actualValue", "actualWage", "dealFlag", "scoutStatus", "priority", "notes"];
+  const columns = ["player", "bestRole", "matchedRoles", "division", "leagueBaseline", "age", "minutes", "bestScore", "goodLookFlags", "totalVfm", "valueRatio", "actualValue", "actualWage", "dealFlag", "scoutStatus", "priority", "notes"];
   const fullRows = databaseRows(databasePlayers);
   const filteredRows = applyColumnFilters(fullRows, columns, state.databaseFilters);
   const rows = sortedRows(filteredRows);

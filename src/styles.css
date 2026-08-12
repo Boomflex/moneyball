@@ -303,6 +303,24 @@ button.primary,
   font-size: 13px;
   font-weight: 800;
 }
+
+.league-fallback-panel {
+  align-items: end;
+}
+
+.league-fallback-panel label {
+  min-width: 260px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.league-fallback-panel select {
+  min-height: 34px;
+  text-transform: none;
+}
 .workspace {
   display: grid;
   gap: 16px;
@@ -1932,20 +1950,20 @@ tbody tr.selected-row:hover {
   vertical-align: middle;
 }
 
-.database-table th:nth-child(5),
-.database-table td:nth-child(5),
 .database-table th:nth-child(6),
 .database-table td:nth-child(6),
 .database-table th:nth-child(7),
 .database-table td:nth-child(7),
-.database-table th:nth-child(9),
-.database-table td:nth-child(9),
+.database-table th:nth-child(8),
+.database-table td:nth-child(8),
 .database-table th:nth-child(10),
 .database-table td:nth-child(10),
 .database-table th:nth-child(11),
 .database-table td:nth-child(11),
 .database-table th:nth-child(12),
-.database-table td:nth-child(12) {
+.database-table td:nth-child(12),
+.database-table th:nth-child(13),
+.database-table td:nth-child(13) {
   text-align: right;
 }
 
@@ -2002,7 +2020,7 @@ tbody tr.selected-row:hover {
 }
 
 .database-table {
-  min-width: 1740px;
+  min-width: 1860px;
 }
 
 .database-table td:nth-child(3),
@@ -2011,8 +2029,8 @@ tbody tr.selected-row:hover {
   font-weight: 850;
 }
 
-.database-table th:nth-child(16),
-.database-table td:nth-child(16) {
+.database-table th:nth-child(17),
+.database-table td:nth-child(17) {
   min-width: 220px;
   text-align: left;
 }

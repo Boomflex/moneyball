@@ -49,7 +49,7 @@ export function valueForStat(get, stat) {
   return raw;
 }
 
-export function scoreRole(row, role, rowIndex = 0) {
+export function scoreRole(row, role, rowIndex = 0, options = {}) {
   const get = rowGetter(row);
   const scores = role.scoreColumns.map((score) => {
     let sum = 0;
@@ -63,7 +63,7 @@ export function scoreRole(row, role, rowIndex = 0) {
         sum += stat.weight * stat.direction * ((value - stat.mean) / stat.stdev);
       }
     }
-    const resolvedLeague = resolveLeague(role, get("Division"));
+    const resolvedLeague = resolveLeague(role, get("Division"), options.leagueFallback);
     const leagueStrength = Number(resolvedLeague.data?.strength) || 35;
     const adjusted = ((sum / score.denominator) + 3) * (leagueStrength / 55) * 10;
     return {
@@ -80,7 +80,7 @@ export function scoreRole(row, role, rowIndex = 0) {
   const rawActualValue = get("Actual Value") || get("Value");
   const actualValue = safeNumber(get("Actual Value")) ?? safeNumber(get("Value"));
   const actualWage = safeNumber(get("Actual Wage")) ?? safeNumber(get("Wage"));
-  const resolvedLeague = resolveLeague(role, get("Division"));
+  const resolvedLeague = resolveLeague(role, get("Division"), options.leagueFallback);
   const league = resolvedLeague.data;
   const expectedValue = league && age !== null && [league.valueScoreCoef, league.valueAgeCoef, league.valueIntercept].every(Number.isFinite)
     ? Math.exp(league.valueScoreCoef * best.score + league.valueAgeCoef * age + league.valueIntercept)
@@ -101,6 +101,7 @@ export function scoreRole(row, role, rowIndex = 0) {
     role: role.id,
     division: resolvedLeague.matched ? resolvedLeague.name : rawDivision,
     sourceDivision: rawDivision,
+    leagueBaseline: resolvedLeague.fallback ? resolvedLeague.name : "",
     age,
     minutes: safeNumber(get("Mins")),
     scores,
@@ -139,7 +140,7 @@ export function inferArchetype(role, bestRole, row) {
   return bestRole;
 }
 
-export function recalcRows({ rows, roles, importRole, importRoleLocked }) {
+export function recalcRows({ rows, roles, importRole, importRoleLocked, leagueFallback = "" }) {
   const entries = [];
   const selectedRole = importRole ? roleById(roles, importRole) : null;
   for (const [rowIndex, row] of rows.entries()) {
@@ -147,7 +148,7 @@ export function recalcRows({ rows, roles, importRole, importRoleLocked }) {
     const inferredRole = selectedRole ? [selectedRole] : roles;
     const candidateRoles = importRoleLocked ? inferredRole : (hintedRoles.length ? hintedRoles : inferredRole);
     const scoredRoles = candidateRoles
-      .map((role) => ({ role, calculated: scoreRole(row, role, rowIndex) }))
+      .map((role) => ({ role, calculated: scoreRole(row, role, rowIndex, { leagueFallback }) }))
       .filter((item) => item.calculated);
 
     if (hintedRoles.length) {

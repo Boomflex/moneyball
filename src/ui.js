@@ -58,6 +58,7 @@ export function labelFor(col) {
     actualValue: "Actual value",
     expectedValue: "Exp value",
     valueRatio: "VFM",
+    leagueBaseline: "League baseline",
     actualWage: "Actual wage",
     expectedWage: "Exp wage",
     dealFlag: "Deal flag",
@@ -211,6 +212,8 @@ export function importReportCard(report) {
   const topRoles = report.roleCoverages.slice(0, 3).map((item) => `${item.role} ${Math.round(item.coverage * 100)}%`).join(" / ");
   const missing = report.missingFields.slice(0, 6).map(escapeHtml).join(", ");
   const derived = report.derivedFields.map((item) => `<li>${escapeHtml(item)}</li>`).join("");
+  const unmatched = report.unmatchedDivisions || [];
+  const fallbackCopy = report.leagueFallback ? `Using ${report.leagueFallback}` : "No fallback selected";
   return `<section class="import-report ${confidence >= 75 ? "good" : "warn"}">
     <div>
       <span>Import confidence</span>
@@ -226,6 +229,11 @@ export function importReportCard(report) {
       <span>Checks</span>
       <strong>${report.missingFields.length ? `${report.missingFields.length} missing score fields` : "All score fields matched"}</strong>
       <small>${missing || "No missing score inputs for detected role"}</small>
+    </div>
+    <div>
+      <span>League data</span>
+      <strong>${unmatched.length ? `${unmatched.length} unmatched division${unmatched.length === 1 ? "" : "s"}` : "All divisions matched"}</strong>
+      <small>${escapeHtml(unmatched.length ? fallbackCopy : "League baselines matched from export")}</small>
     </div>
     ${derived ? `<ul>${derived}</ul>` : ""}
   </section>`;

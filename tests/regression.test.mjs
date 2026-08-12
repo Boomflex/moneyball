@@ -40,6 +40,18 @@ assert.equal(
   "Below",
   "Lower-is-better Mustermann bands should flag poor possession security",
 );
+const fallbackLeague = resolveLeague(MODEL.roles[0], "Made Up Super League", "Vanarama National League");
+assert.equal(fallbackLeague.name, "Vanarama National League", "Unmatched divisions should be able to use a fallback league baseline");
+assert.equal(fallbackLeague.matched, false, "Fallback league baselines should not pretend the raw division matched");
+assert.equal(fallbackLeague.fallback, true, "Fallback league baselines should be marked as fallback data");
+const mlsLeague = resolveLeague(MODEL.roles[0], "MLS");
+assert.equal(mlsLeague.name, "Major League Soccer", "MLS should resolve to the derived Major League Soccer baseline");
+assert.equal(mlsLeague.matched, true, "MLS alias should count as matched league data");
+assert.equal(
+  analyzeImport([{ Player: "Test", Division: "Made Up Super League" }], MODEL.roles, { id: "CB", locked: true }).unmatchedDivisions[0]?.division,
+  "Made Up Super League",
+  "Import report should list unmatched division names",
+);
 assert.equal(
   dealFlag({ bestScore: 99, age: 21, actualValue: null, valueStatus: "Not For Sale" }, { freeAgentThreshold: 1 }),
   "Not For Sale",

@@ -1,4 +1,5 @@
 import { mean, normalise, roleIdsFromPositionText } from "./utils.js";
+import { resolveLeague } from "./league-overrides.js";
 
 const CLUB_DIVISION_OVERRIDES = new Map([
   ["riotinto", { division: "No league data", note: "Rio Tinto division corrected to No league data from exported league value" }],
@@ -293,7 +294,22 @@ export function inferImportRole(rows, roles) {
   };
 }
 
-export function analyzeImport(rows, roles, importRole) {
+function unmatchedDivisionsForRows(rows, roles, importRole) {
+  const selectedRole = roles.find((role) => role.id === importRole?.id);
+  const checkedRoles = selectedRole ? [selectedRole] : roles;
+  const divisions = new Map();
+  for (const row of rows) {
+    const division = String(rowGetter(row)("Division") || "").trim();
+    if (!division) continue;
+    const matched = checkedRoles.some((role) => resolveLeague(role, division).matched);
+    if (!matched) divisions.set(division, (divisions.get(division) || 0) + 1);
+  }
+  return [...divisions.entries()]
+    .map(([division, count]) => ({ division, count }))
+    .sort((a, b) => b.count - a.count || a.division.localeCompare(b.division));
+}
+
+export function analyzeImport(rows, roles, importRole, leagueFallback = "") {
   const headers = rows[0] ? Object.keys(rows[0]) : [];
   const candidates = roleCoverage(rows, roles);
   const selected = roles.find((role) => role.id === importRole?.id) || candidates[0]?.role || null;
@@ -319,6 +335,8 @@ export function analyzeImport(rows, roles, importRole) {
     matchedFields: selectedCoverage?.matched ?? [],
     missingFields: selectedCoverage?.missing ?? [],
     derivedFields: derived,
+    unmatchedDivisions: unmatchedDivisionsForRows(rows, roles, importRole),
+    leagueFallback,
   };
 }
 
