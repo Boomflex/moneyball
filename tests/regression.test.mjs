@@ -138,6 +138,56 @@ assert.equal(
   "Uruguayan Premier League exports should resolve from Based In context",
 );
 assert.equal(
+  resolveLeague(MODEL.roles[0], "Premier League", "", { basedIn: "England" }).name,
+  "English Premier Division",
+  "English Premier League exports should resolve from Based In context",
+);
+assert.equal(
+  resolveLeague(MODEL.roles[0], "Serie A", "", { basedIn: "Italy" }).name,
+  "Italian Serie A",
+  "Italian Serie A exports should resolve from Based In context",
+);
+assert.equal(
+  resolveLeague(MODEL.roles[0], "First Division", "", { basedIn: "Spain" }).name,
+  "Spanish First Division",
+  "Spanish First Division exports should resolve from Based In context",
+);
+assert.equal(
+  resolveLeague(MODEL.roles[0], "Premier League", "", { basedIn: "Portugal" }).name,
+  "Portuguese Premier League",
+  "Portuguese Premier League exports should resolve from Based In context",
+);
+assert.equal(
+  resolveLeague(MODEL.roles[0], "Serie BKT", "", { basedIn: "Italy" }).name,
+  "Italian Serie B",
+  "Italian Serie BKT exports should resolve from Based In context",
+);
+assert.equal(
+  resolveLeague(MODEL.roles[0], "First League", "", { basedIn: "Croatia" }).name,
+  "Croatian First League",
+  "Croatian First League exports should resolve from Based In context",
+);
+assert.equal(
+  resolveLeague(MODEL.roles[0], "Second Division", "", { basedIn: "Spain" }).name,
+  "Spanish Second Division",
+  "Spanish Second Division exports should resolve from Based In context",
+);
+assert.equal(
+  resolveLeague(MODEL.roles[0], "Super League", "", { basedIn: "Türkiye" }).name,
+  "Turkish Super League",
+  "Turkish Super League exports should resolve from Based In context",
+);
+assert.equal(
+  resolveLeague(MODEL.roles[0], "Super League 1", "", { basedIn: "Greece" }).name,
+  "Greek Super League 1",
+  "Greek Super League 1 exports should resolve from Based In context",
+);
+assert.equal(
+  resolveLeague(MODEL.roles[0], "William Hill Premiership", "", { basedIn: "Scotland" }).name,
+  "Scottish Premiership",
+  "William Hill Premiership exports should resolve to the Scottish Premiership from Based In context",
+);
+assert.equal(
   analyzeImport([{ Player: "Test", Division: "Made Up Super League" }], MODEL.roles, { id: "CB", locked: true }).unmatchedDivisions[0]?.division,
   "Made Up Super League",
   "Import report should list unmatched division names",
