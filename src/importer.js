@@ -299,13 +299,18 @@ function unmatchedDivisionsForRows(rows, roles, importRole) {
   const checkedRoles = selectedRole ? [selectedRole] : roles;
   const divisions = new Map();
   for (const row of rows) {
-    const division = String(rowGetter(row)("Division") || "").trim();
+    const get = rowGetter(row);
+    const division = String(get("Division") || "").trim();
+    const nation = String(get("Nation") || "").trim();
     if (!division) continue;
-    const matched = checkedRoles.some((role) => resolveLeague(role, division).matched);
-    if (!matched) divisions.set(division, (divisions.get(division) || 0) + 1);
+    const matched = checkedRoles.some((role) => resolveLeague(role, division, "", { nation: get("Nation") }).matched);
+    if (matched) continue;
+    const key = `${division}\u0000${nation}`;
+    const existing = divisions.get(key) || { division, nation, count: 0 };
+    existing.count += 1;
+    divisions.set(key, existing);
   }
-  return [...divisions.entries()]
-    .map(([division, count]) => ({ division, count }))
+  return [...divisions.values()]
     .sort((a, b) => b.count - a.count || a.division.localeCompare(b.division));
 }
 

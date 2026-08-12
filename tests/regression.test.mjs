@@ -48,9 +48,44 @@ const mlsLeague = resolveLeague(MODEL.roles[0], "MLS");
 assert.equal(mlsLeague.name, "Major League Soccer", "MLS should resolve to the derived Major League Soccer baseline");
 assert.equal(mlsLeague.matched, true, "MLS alias should count as matched league data");
 assert.equal(
+  resolveLeague(MODEL.roles[0], "First Division", "", { nation: "BRA" }).name,
+  "Brazilian National First Division",
+  "Brazilian First Division exports should resolve from nation context",
+);
+assert.equal(
+  resolveLeague(MODEL.roles[0], "First Division ID: 102423").name,
+  "Brazilian National First Division",
+  "Brazilian competition ID exports should resolve to the Brazilian National First Division",
+);
+assert.equal(
+  resolveLeague(MODEL.roles.find((role) => role.id === "Winger"), "First Division", "", { nation: "BRA" }).name,
+  "Brazilian National First Division",
+  "Brazilian First Division exports should resolve even for roles with derived Brazil data",
+);
+assert.equal(
+  resolveLeague(MODEL.roles.find((role) => role.id === "CB"), "First Division", "", { nation: "ARG" }).name,
+  "Argentine Premier Division",
+  "Argentine First Division exports should not be mistaken for Brazil",
+);
+assert.equal(
+  resolveLeague(MODEL.roles[0], "Premier Division", "", { nation: "SWE" }).name,
+  "Swedish Premier Division",
+  "Swedish Premier Division exports should resolve from nation context",
+);
+assert.equal(
+  resolveLeague(MODEL.roles[0], "K League 1").name,
+  "K League 1",
+  "K League 1 should resolve to derived league data",
+);
+assert.equal(
   analyzeImport([{ Player: "Test", Division: "Made Up Super League" }], MODEL.roles, { id: "CB", locked: true }).unmatchedDivisions[0]?.division,
   "Made Up Super League",
   "Import report should list unmatched division names",
+);
+assert.equal(
+  analyzeImport([{ Player: "Test", Nation: "AAA", Division: "Made Up Super League" }], MODEL.roles, { id: "CB", locked: true }).unmatchedDivisions[0]?.nation,
+  "AAA",
+  "Import report should keep unmatched division nation context",
 );
 assert.equal(
   dealFlag({ bestScore: 99, age: 21, actualValue: null, valueStatus: "Not For Sale" }, { freeAgentThreshold: 1 }),

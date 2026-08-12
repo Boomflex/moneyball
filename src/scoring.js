@@ -51,6 +51,7 @@ export function valueForStat(get, stat) {
 
 export function scoreRole(row, role, rowIndex = 0, options = {}) {
   const get = rowGetter(row);
+  const leagueContext = { nation: get("Nation") };
   const scores = role.scoreColumns.map((score) => {
     let sum = 0;
     let coverage = 0;
@@ -63,7 +64,7 @@ export function scoreRole(row, role, rowIndex = 0, options = {}) {
         sum += stat.weight * stat.direction * ((value - stat.mean) / stat.stdev);
       }
     }
-    const resolvedLeague = resolveLeague(role, get("Division"), options.leagueFallback);
+    const resolvedLeague = resolveLeague(role, get("Division"), options.leagueFallback, leagueContext);
     const leagueStrength = Number(resolvedLeague.data?.strength) || 35;
     const adjusted = ((sum / score.denominator) + 3) * (leagueStrength / 55) * 10;
     return {
@@ -80,7 +81,7 @@ export function scoreRole(row, role, rowIndex = 0, options = {}) {
   const rawActualValue = get("Actual Value") || get("Value");
   const actualValue = safeNumber(get("Actual Value")) ?? safeNumber(get("Value"));
   const actualWage = safeNumber(get("Actual Wage")) ?? safeNumber(get("Wage"));
-  const resolvedLeague = resolveLeague(role, get("Division"), options.leagueFallback);
+  const resolvedLeague = resolveLeague(role, get("Division"), options.leagueFallback, leagueContext);
   const league = resolvedLeague.data;
   const expectedValue = league && age !== null && [league.valueScoreCoef, league.valueAgeCoef, league.valueIntercept].every(Number.isFinite)
     ? Math.exp(league.valueScoreCoef * best.score + league.valueAgeCoef * age + league.valueIntercept)

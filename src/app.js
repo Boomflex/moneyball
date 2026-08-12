@@ -906,7 +906,10 @@ function leagueFallbackPanel() {
   const unmatched = state.importReport?.unmatchedDivisions || [];
   if (!unmatched.length) return "";
   const options = leagueFallbackOptions();
-  const unmatchedText = unmatched.slice(0, 8).map((item) => `${item.division} (${item.count})`).join(", ");
+  const unmatchedText = unmatched
+    .slice(0, 8)
+    .map((item) => `${item.division}${item.nation ? ` / ${item.nation}` : ""} (${item.count})`)
+    .join(", ");
   return `<section class="notice league-fallback-panel" role="status">
     <strong>${unmatched.length} unmatched division${unmatched.length === 1 ? "" : "s"}</strong>
     <span>${escapeHtml(unmatchedText)}${unmatched.length > 8 ? "..." : ""}</span>
@@ -1402,7 +1405,7 @@ function databaseScoreAuditPanel(player) {
   const profile = role ? scoreProfileForPlayer(player, role) : null;
   const rows = databaseScoreAuditRows(player).slice(0, 10);
   const get = rowGetter(player.source);
-  const league = role ? resolveLeague(role, get("Division"), state.leagueFallback) : null;
+  const league = role ? resolveLeague(role, get("Division"), state.leagueFallback, { nation: get("Nation") }) : null;
   const coverage = Number.isFinite(player.coverage) ? `${fmt(player.coverage * 100)}%` : "";
   const leagueNote = league?.fallback ? `${league.fallbackFrom} scored as ${league.name}` : league?.aliasFrom ? `${league.aliasFrom} -> ${league.name}` : league?.name || player.division;
   return `<section class="panel score-audit-panel">
