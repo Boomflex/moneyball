@@ -26,6 +26,25 @@ const OVERRIDES = [
     strengthDelta: 0,
     note: "Derived baseline: workbook has no native K League 1 data, so it uses Swedish Premier Division until a dedicated baseline exists.",
   },
+  {
+    names: ["J1 League"],
+    baseLeague: "Norwegian Premier Division",
+    strengthDelta: 0,
+    note: "Derived baseline: workbook has no native J1 League data, so it uses Norwegian Premier Division until a dedicated baseline exists.",
+  },
+  {
+    names: ["Belgian Pro League"],
+    baseLeague: "Norwegian Premier Division",
+    strengthDelta: 0,
+    note: "Derived baseline: workbook has no native Belgian Pro League data, so it uses Norwegian Premier Division until a dedicated baseline exists.",
+  },
+  {
+    names: ["Mexican First Division"],
+    baseLeague: "Norwegian Premier Division",
+    strengthDelta: 0,
+    ifMissingOnly: true,
+    note: "Derived baseline: workbook has no native Mexican First Division data for this role, so it uses Norwegian Premier Division until a dedicated baseline exists.",
+  },
 ];
 
 const LEAGUE_ALIASES = new Map([
@@ -44,8 +63,23 @@ const NATION_LEAGUE_ALIASES = new Map([
   ["firstdivision|brazil", "Brazilian National First Division"],
   ["firstdivision|arg", "Argentine Premier Division"],
   ["firstdivision|argentina", "Argentine Premier Division"],
+  ["firstdivision|bel", "Belgian Pro League"],
+  ["firstdivision|belgium", "Belgian Pro League"],
+  ["firstdivision|mex", "Mexican First Division"],
+  ["firstdivision|mexico", "Mexican First Division"],
+  ["firstleague|bih", "Bosnian Premier League"],
+  ["firstleague|bosnia", "Bosnian Premier League"],
+  ["firstleague|bosniaandherzegovina", "Bosnian Premier League"],
+  ["firstleague|bul", "Bulgarian First League"],
+  ["firstleague|bulgaria", "Bulgarian First League"],
+  ["j1league|jpn", "J1 League"],
+  ["j1league|japan", "J1 League"],
+  ["premierdivision|nor", "Norwegian Premier Division"],
+  ["premierdivision|norway", "Norwegian Premier Division"],
   ["premierdivision|swe", "Swedish Premier Division"],
   ["premierdivision|sweden", "Swedish Premier Division"],
+  ["premierleague|ukr", "Ukrainian Premier League"],
+  ["premierleague|ukraine", "Ukrainian Premier League"],
 ]);
 
 export function applyLeagueOverrides(model) {

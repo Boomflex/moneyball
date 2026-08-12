@@ -78,6 +78,46 @@ assert.equal(
   "K League 1 should resolve to derived league data",
 );
 assert.equal(
+  resolveLeague(MODEL.roles[0], "J1 League", "", { nation: "JPN" }).name,
+  "J1 League",
+  "J1 League exports should resolve from nation context",
+);
+assert.equal(
+  resolveLeague(MODEL.roles[0], "Premier Division", "", { nation: "NOR" }).name,
+  "Norwegian Premier Division",
+  "Norwegian Premier Division exports should resolve from nation context",
+);
+assert.equal(
+  resolveLeague(MODEL.roles[0], "Premier League", "", { nation: "UKR" }).name,
+  "Ukrainian Premier League",
+  "Ukrainian Premier League exports should resolve from nation context",
+);
+assert.equal(
+  resolveLeague(MODEL.roles[0], "First Division", "", { nation: "MEX" }).name,
+  "Mexican First Division",
+  "Mexican First Division exports should resolve from nation context",
+);
+assert.equal(
+  resolveLeague(MODEL.roles.find((role) => role.id === "Winger"), "First Division", "", { nation: "MEX" }).name,
+  "Mexican First Division",
+  "Mexican First Division exports should resolve for roles with derived Mexico data",
+);
+assert.equal(
+  resolveLeague(MODEL.roles[0], "First Division", "", { nation: "BEL" }).name,
+  "Belgian Pro League",
+  "Belgian First Division exports should resolve from nation context",
+);
+assert.equal(
+  resolveLeague(MODEL.roles[0], "First League", "", { nation: "BUL" }).name,
+  "Bulgarian First League",
+  "Bulgarian First League exports should resolve from nation context",
+);
+assert.equal(
+  resolveLeague(MODEL.roles[0], "First League", "", { nation: "BIH" }).name,
+  "Bosnian Premier League",
+  "Bosnian First League exports should resolve to the Bosnian Premier League from nation context",
+);
+assert.equal(
   analyzeImport([{ Player: "Test", Division: "Made Up Super League" }], MODEL.roles, { id: "CB", locked: true }).unmatchedDivisions[0]?.division,
   "Made Up Super League",
   "Import report should list unmatched division names",
