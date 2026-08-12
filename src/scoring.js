@@ -51,7 +51,7 @@ export function valueForStat(get, stat) {
 
 export function scoreRole(row, role, rowIndex = 0, options = {}) {
   const get = rowGetter(row);
-  const leagueContext = { nation: get("Nation") };
+  const leagueContext = { basedIn: get("Based In") };
   const scores = role.scoreColumns.map((score) => {
     let sum = 0;
     let coverage = 0;

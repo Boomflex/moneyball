@@ -907,12 +907,15 @@ function leagueFallbackPanel() {
   if (!unmatched.length) return "";
   const options = leagueFallbackOptions();
   const unmatchedText = unmatched
-    .slice(0, 8)
-    .map((item) => `${item.division}${item.nation ? ` / ${item.nation}` : ""} (${item.count})`)
-    .join(", ");
+    .map((item) => `${item.division}${item.basedIn ? ` / ${item.basedIn}` : ""} (${item.count})`)
+    .join("\n");
+  const rows = Math.max(3, Math.min(12, unmatched.length));
   return `<section class="notice league-fallback-panel" role="status">
     <strong>${unmatched.length} unmatched division${unmatched.length === 1 ? "" : "s"}</strong>
-    <span>${escapeHtml(unmatchedText)}${unmatched.length > 8 ? "..." : ""}</span>
+    <div class="league-unmatched-copy">
+      <textarea id="unmatchedDivisionsText" readonly rows="${rows}" spellcheck="false">${escapeHtml(unmatchedText)}</textarea>
+      <button class="ghost" id="copyUnmatchedDivisions" type="button">Copy all</button>
+    </div>
     <label>Fallback baseline
       <select id="leagueFallback">
         <option value="" ${state.leagueFallback ? "" : "selected"}>Keep as No league data</option>
@@ -1028,6 +1031,17 @@ function bindGlobal() {
     refreshRecruitmentScores();
     state.databaseAuditId = null;
     render();
+  });
+  app.querySelector("#copyUnmatchedDivisions")?.addEventListener("click", async () => {
+    const text = app.querySelector("#unmatchedDivisionsText")?.value || "";
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const input = app.querySelector("#unmatchedDivisionsText");
+      input?.select();
+      document.execCommand("copy");
+    }
   });
 }
 
@@ -1300,7 +1314,7 @@ function databaseScoreAuditRows(player) {
   const profile = role ? scoreProfileForPlayer(player, role) : null;
   if (!role || !profile) return [];
   const get = rowGetter(player.source);
-  const league = resolveLeague(role, get("Division"));
+  const league = resolveLeague(role, get("Division"), state.leagueFallback, { basedIn: get("Based In") });
   const leagueStrength = Number(league.data?.strength) || 35;
   return profile.stats.map((stat) => {
     const value = valueForStat(get, stat);
@@ -1405,7 +1419,7 @@ function databaseScoreAuditPanel(player) {
   const profile = role ? scoreProfileForPlayer(player, role) : null;
   const rows = databaseScoreAuditRows(player).slice(0, 10);
   const get = rowGetter(player.source);
-  const league = role ? resolveLeague(role, get("Division"), state.leagueFallback, { nation: get("Nation") }) : null;
+  const league = role ? resolveLeague(role, get("Division"), state.leagueFallback, { basedIn: get("Based In") }) : null;
   const coverage = Number.isFinite(player.coverage) ? `${fmt(player.coverage * 100)}%` : "";
   const leagueNote = league?.fallback ? `${league.fallbackFrom} scored as ${league.name}` : league?.aliasFrom ? `${league.aliasFrom} -> ${league.name}` : league?.name || player.division;
   return `<section class="panel score-audit-panel">

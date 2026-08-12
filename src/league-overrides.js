@@ -39,6 +39,20 @@ const OVERRIDES = [
     note: "Derived baseline: workbook has no native Belgian Pro League data, so it uses Norwegian Premier Division until a dedicated baseline exists.",
   },
   {
+    names: ["Argentine Premier Division"],
+    baseLeague: "Norwegian Premier Division",
+    strengthDelta: 0,
+    ifMissingOnly: true,
+    note: "Derived baseline: workbook has no native Argentine Premier Division data for this role, so it uses Norwegian Premier Division until a dedicated baseline exists.",
+  },
+  {
+    names: ["Uruguayan First Division"],
+    baseLeague: "Norwegian Premier Division",
+    strengthDelta: 0,
+    ifMissingOnly: true,
+    note: "Derived baseline: workbook has no native Uruguayan First Division data for this role, so it uses Norwegian Premier Division until a dedicated baseline exists.",
+  },
+  {
     names: ["Mexican First Division"],
     baseLeague: "Norwegian Premier Division",
     strengthDelta: 0,
@@ -50,6 +64,7 @@ const OVERRIDES = [
 const LEAGUE_ALIASES = new Map([
   ["englishnationalleague", "Vanarama National League"],
   ["firstdivisionid102423", "Brazilian National First Division"],
+  ["ligue1mcdonalds", "Ligue 1 Uber Eats"],
   ["mls", "Major League Soccer"],
   ["majorleaguesoccer", "Major League Soccer"],
   ["northernirelandpremiership", "NIFL Premiership"],
@@ -58,7 +73,7 @@ const LEAGUE_ALIASES = new Map([
   ["niflpremiership", "NIFL Premiership"],
 ]);
 
-const NATION_LEAGUE_ALIASES = new Map([
+const BASED_IN_LEAGUE_ALIASES = new Map([
   ["firstdivision|bra", "Brazilian National First Division"],
   ["firstdivision|brazil", "Brazilian National First Division"],
   ["firstdivision|arg", "Argentine Premier Division"],
@@ -76,8 +91,12 @@ const NATION_LEAGUE_ALIASES = new Map([
   ["j1league|japan", "J1 League"],
   ["premierdivision|nor", "Norwegian Premier Division"],
   ["premierdivision|norway", "Norwegian Premier Division"],
+  ["premierdivision|arg", "Argentine Premier Division"],
+  ["premierdivision|argentina", "Argentine Premier Division"],
   ["premierdivision|swe", "Swedish Premier Division"],
   ["premierdivision|sweden", "Swedish Premier Division"],
+  ["premierleague|uru", "Uruguayan First Division"],
+  ["premierleague|uruguay", "Uruguayan First Division"],
   ["premierleague|ukr", "Ukrainian Premier League"],
   ["premierleague|ukraine", "Ukrainian Premier League"],
 ]);
@@ -110,10 +129,10 @@ export function resolveLeague(role, rawDivision, fallbackLeague = "", context = 
   if (role.leagues[division]) return { name: division, data: role.leagues[division], matched: true };
 
   const normalised = normalise(division);
-  const nation = normalise(context.nation || context.country || "");
-  const nationAlias = NATION_LEAGUE_ALIASES.get(`${normalised}|${nation}`);
-  if (nationAlias && role.leagues[nationAlias]) {
-    return { name: nationAlias, data: role.leagues[nationAlias], matched: true, aliasFrom: division };
+  const basedIn = normalise(context.basedIn || context.leagueCountry || context.country || "");
+  const basedInAlias = BASED_IN_LEAGUE_ALIASES.get(`${normalised}|${basedIn}`);
+  if (basedInAlias && role.leagues[basedInAlias]) {
+    return { name: basedInAlias, data: role.leagues[basedInAlias], matched: true, aliasFrom: division };
   }
 
   const alias = LEAGUE_ALIASES.get(normalised);

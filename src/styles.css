@@ -308,6 +308,32 @@ button.primary,
   align-items: end;
 }
 
+.league-unmatched-copy {
+  flex: 1;
+  min-width: min(620px, 100%);
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.league-unmatched-copy textarea {
+  width: 100%;
+  min-height: 72px;
+  max-height: 210px;
+  padding: 8px 10px;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+  resize: vertical;
+  white-space: pre;
+}
+
+.league-unmatched-copy button {
+  min-height: 34px;
+}
+
 .league-fallback-panel label {
   min-width: 260px;
   color: var(--muted);
@@ -2321,6 +2347,15 @@ tbody tr.selected-row:hover {
   .selectors label,
   .player-card {
     flex: 1 1 100%;
+  }
+
+  .league-unmatched-copy {
+    grid-template-columns: 1fr;
+  }
+
+  .league-fallback-panel label {
+    min-width: 0;
+    width: 100%;
   }
 
   .workspace-compare .selectors {

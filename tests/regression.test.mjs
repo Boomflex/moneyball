@@ -48,9 +48,14 @@ const mlsLeague = resolveLeague(MODEL.roles[0], "MLS");
 assert.equal(mlsLeague.name, "Major League Soccer", "MLS should resolve to the derived Major League Soccer baseline");
 assert.equal(mlsLeague.matched, true, "MLS alias should count as matched league data");
 assert.equal(
-  resolveLeague(MODEL.roles[0], "First Division", "", { nation: "BRA" }).name,
+  resolveLeague(MODEL.roles[0], "First Division", "", { basedIn: "BRA" }).name,
   "Brazilian National First Division",
-  "Brazilian First Division exports should resolve from nation context",
+  "Brazilian First Division exports should resolve from Based In context",
+);
+assert.equal(
+  resolveLeague(MODEL.roles[0], "First Division", "", { nation: "BRA" }).matched,
+  false,
+  "Player nationality should not drive ambiguous division league matching",
 );
 assert.equal(
   resolveLeague(MODEL.roles[0], "First Division ID: 102423").name,
@@ -58,19 +63,19 @@ assert.equal(
   "Brazilian competition ID exports should resolve to the Brazilian National First Division",
 );
 assert.equal(
-  resolveLeague(MODEL.roles.find((role) => role.id === "Winger"), "First Division", "", { nation: "BRA" }).name,
+  resolveLeague(MODEL.roles.find((role) => role.id === "Winger"), "First Division", "", { basedIn: "BRA" }).name,
   "Brazilian National First Division",
   "Brazilian First Division exports should resolve even for roles with derived Brazil data",
 );
 assert.equal(
-  resolveLeague(MODEL.roles.find((role) => role.id === "CB"), "First Division", "", { nation: "ARG" }).name,
+  resolveLeague(MODEL.roles.find((role) => role.id === "CB"), "First Division", "", { basedIn: "ARG" }).name,
   "Argentine Premier Division",
   "Argentine First Division exports should not be mistaken for Brazil",
 );
 assert.equal(
-  resolveLeague(MODEL.roles[0], "Premier Division", "", { nation: "SWE" }).name,
+  resolveLeague(MODEL.roles[0], "Premier Division", "", { basedIn: "SWE" }).name,
   "Swedish Premier Division",
-  "Swedish Premier Division exports should resolve from nation context",
+  "Swedish Premier Division exports should resolve from Based In context",
 );
 assert.equal(
   resolveLeague(MODEL.roles[0], "K League 1").name,
@@ -78,44 +83,59 @@ assert.equal(
   "K League 1 should resolve to derived league data",
 );
 assert.equal(
-  resolveLeague(MODEL.roles[0], "J1 League", "", { nation: "JPN" }).name,
+  resolveLeague(MODEL.roles[0], "J1 League", "", { basedIn: "JPN" }).name,
   "J1 League",
-  "J1 League exports should resolve from nation context",
+  "J1 League exports should resolve from Based In context",
 );
 assert.equal(
-  resolveLeague(MODEL.roles[0], "Premier Division", "", { nation: "NOR" }).name,
+  resolveLeague(MODEL.roles[0], "Premier Division", "", { basedIn: "NOR" }).name,
   "Norwegian Premier Division",
-  "Norwegian Premier Division exports should resolve from nation context",
+  "Norwegian Premier Division exports should resolve from Based In context",
 );
 assert.equal(
-  resolveLeague(MODEL.roles[0], "Premier League", "", { nation: "UKR" }).name,
+  resolveLeague(MODEL.roles[0], "Premier League", "", { basedIn: "UKR" }).name,
   "Ukrainian Premier League",
-  "Ukrainian Premier League exports should resolve from nation context",
+  "Ukrainian Premier League exports should resolve from Based In context",
 );
 assert.equal(
-  resolveLeague(MODEL.roles[0], "First Division", "", { nation: "MEX" }).name,
+  resolveLeague(MODEL.roles[0], "First Division", "", { basedIn: "MEX" }).name,
   "Mexican First Division",
-  "Mexican First Division exports should resolve from nation context",
+  "Mexican First Division exports should resolve from Based In context",
 );
 assert.equal(
-  resolveLeague(MODEL.roles.find((role) => role.id === "Winger"), "First Division", "", { nation: "MEX" }).name,
+  resolveLeague(MODEL.roles.find((role) => role.id === "Winger"), "First Division", "", { basedIn: "MEX" }).name,
   "Mexican First Division",
   "Mexican First Division exports should resolve for roles with derived Mexico data",
 );
 assert.equal(
-  resolveLeague(MODEL.roles[0], "First Division", "", { nation: "BEL" }).name,
+  resolveLeague(MODEL.roles[0], "First Division", "", { basedIn: "BEL" }).name,
   "Belgian Pro League",
-  "Belgian First Division exports should resolve from nation context",
+  "Belgian First Division exports should resolve from Based In context",
 );
 assert.equal(
-  resolveLeague(MODEL.roles[0], "First League", "", { nation: "BUL" }).name,
+  resolveLeague(MODEL.roles[0], "First League", "", { basedIn: "BUL" }).name,
   "Bulgarian First League",
-  "Bulgarian First League exports should resolve from nation context",
+  "Bulgarian First League exports should resolve from Based In context",
 );
 assert.equal(
-  resolveLeague(MODEL.roles[0], "First League", "", { nation: "BIH" }).name,
+  resolveLeague(MODEL.roles[0], "First League", "", { basedIn: "BIH" }).name,
   "Bosnian Premier League",
-  "Bosnian First League exports should resolve to the Bosnian Premier League from nation context",
+  "Bosnian First League exports should resolve to the Bosnian Premier League from Based In context",
+);
+assert.equal(
+  resolveLeague(MODEL.roles[0], "Ligue 1 McDonald's").name,
+  "Ligue 1 Uber Eats",
+  "Ligue 1 McDonald's exports should resolve to the workbook's Ligue 1 baseline",
+);
+assert.equal(
+  resolveLeague(MODEL.roles.find((role) => role.id === "CB"), "Premier Division", "", { basedIn: "ARG" }).name,
+  "Argentine Premier Division",
+  "Argentine Premier Division exports should resolve from Based In context",
+);
+assert.equal(
+  resolveLeague(MODEL.roles[0], "Premier League", "", { basedIn: "URU" }).name,
+  "Uruguayan First Division",
+  "Uruguayan Premier League exports should resolve from Based In context",
 );
 assert.equal(
   analyzeImport([{ Player: "Test", Division: "Made Up Super League" }], MODEL.roles, { id: "CB", locked: true }).unmatchedDivisions[0]?.division,
@@ -123,9 +143,9 @@ assert.equal(
   "Import report should list unmatched division names",
 );
 assert.equal(
-  analyzeImport([{ Player: "Test", Nation: "AAA", Division: "Made Up Super League" }], MODEL.roles, { id: "CB", locked: true }).unmatchedDivisions[0]?.nation,
+  analyzeImport([{ Player: "Test", "Based In": "AAA", Division: "Made Up Super League" }], MODEL.roles, { id: "CB", locked: true }).unmatchedDivisions[0]?.basedIn,
   "AAA",
-  "Import report should keep unmatched division nation context",
+  "Import report should keep unmatched division Based In context",
 );
 assert.equal(
   dealFlag({ bestScore: 99, age: 21, actualValue: null, valueStatus: "Not For Sale" }, { freeAgentThreshold: 1 }),
@@ -156,7 +176,7 @@ const EXPORTS = {
   },
   CorrectedRioTinto: {
     path: "C:/Users/jakek/OneDrive/Documents/Sports Interactive/Football Manager 26/FM26PlayerExport by vinteset/Exports CSV/moneyball_export_20260721_212326.csv",
-    expected: { rowCount: 31, importRole: "CB", coverage: 93.3, entries: 31, positionMatched: true, top: { player: "Denis Moukoko", role: "CB", bestRole: "Stopper", bestScore: 27.3, totalVfm: 2.1, valueRatio: null, dealFlag: "No league data" }, players: { "Abulai Mendy": { division: "No league data", bestScore: 22.2, dealFlag: "FREE - bargain" } }, noteIncludes: "Rio Tinto division corrected to No league data" },
+    expected: { rowCount: 31, importRole: "CB", coverage: 93.3, entries: 31, positionMatched: true, top: { player: "Diogo Sainhas", role: "CB", bestRole: "Ball-Playing", bestScore: 44.3, totalVfm: 2.7, valueRatio: null, dealFlag: "FREE - bargain" }, players: { "Abulai Mendy": { division: "No league data", bestScore: 22.2, dealFlag: "FREE - bargain" } }, noteIncludes: "Rio Tinto division corrected to No league data" },
   },
   CM: {
     path: "C:/Users/jakek/OneDrive/Documents/Sports Interactive/Football Manager 26/FM26PlayerExport by vinteset/Exports CSV/moneyball_export_20260718_152255.csv",

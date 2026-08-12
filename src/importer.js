@@ -301,12 +301,12 @@ function unmatchedDivisionsForRows(rows, roles, importRole) {
   for (const row of rows) {
     const get = rowGetter(row);
     const division = String(get("Division") || "").trim();
-    const nation = String(get("Nation") || "").trim();
+    const basedIn = String(get("Based In") || "").trim();
     if (!division) continue;
-    const matched = checkedRoles.some((role) => resolveLeague(role, division, "", { nation: get("Nation") }).matched);
+    const matched = checkedRoles.some((role) => resolveLeague(role, division, "", { basedIn }).matched);
     if (matched) continue;
-    const key = `${division}\u0000${nation}`;
-    const existing = divisions.get(key) || { division, nation, count: 0 };
+    const key = `${division}\u0000${basedIn}`;
+    const existing = divisions.get(key) || { division, basedIn, count: 0 };
     existing.count += 1;
     divisions.set(key, existing);
   }
