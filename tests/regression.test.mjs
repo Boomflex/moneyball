@@ -193,6 +193,11 @@ assert.equal(
   "Turkish Super League exports should resolve from Based In context",
 );
 assert.equal(
+  resolveLeague(MODEL.roles[0], "SuperLeague", "", { basedIn: "Serbia" }).name,
+  "Serbian SuperLeague",
+  "Serbian SuperLeague exports should resolve from Based In context",
+);
+assert.equal(
   resolveLeague(MODEL.roles[0], "Super League 1", "", { basedIn: "Greece" }).name,
   "Greek Super League 1",
   "Greek Super League 1 exports should resolve from Based In context",

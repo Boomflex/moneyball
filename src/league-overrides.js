@@ -128,6 +128,8 @@ const BASED_IN_LEAGUE_ALIASES = new Map([
   ["superleague|turkey", "Turkish Super League"],
   ["superleague|trkiye", "Turkish Super League"],
   ["superleague|türkiye", "Turkish Super League"],
+  ["superleague|srb", "Serbian SuperLeague"],
+  ["superleague|serbia", "Serbian SuperLeague"],
   ["superleague1|gre", "Greek Super League 1"],
   ["superleague1|greece", "Greek Super League 1"],
   ["williamhillpremiership|sco", "Scottish Premiership"],
