@@ -138,6 +138,16 @@ assert.equal(
   "Uruguayan Premier League exports should resolve from Based In context",
 );
 assert.equal(
+  resolveLeague(MODEL.roles[0], "PKO BP Ekstraklasa", "", { basedIn: "Poland" }).name,
+  "PKO Bank Polski Ekstraklasa",
+  "PKO BP Ekstraklasa exports should resolve to the workbook's Polish top-flight baseline",
+);
+assert.equal(
+  resolveLeague(MODEL.roles[0], "Premier Division", "", { basedIn: "Austria" }).name,
+  "Austrian Premier Division",
+  "Austrian Premier Division exports should resolve from Based In context",
+);
+assert.equal(
   resolveLeague(MODEL.roles[0], "Premier League", "", { basedIn: "England" }).name,
   "English Premier Division",
   "English Premier League exports should resolve from Based In context",
@@ -156,6 +166,11 @@ assert.equal(
   resolveLeague(MODEL.roles[0], "Premier League", "", { basedIn: "Portugal" }).name,
   "Portuguese Premier League",
   "Portuguese Premier League exports should resolve from Based In context",
+);
+assert.equal(
+  resolveLeague(MODEL.roles[0], "Premier League", "", { basedIn: "Russia" }).name,
+  "Russian Premier League",
+  "Russian Premier League exports should resolve from Based In context",
 );
 assert.equal(
   resolveLeague(MODEL.roles[0], "Serie BKT", "", { basedIn: "Italy" }).name,
@@ -197,6 +212,19 @@ assert.equal(
   "AAA",
   "Import report should keep unmatched division Based In context",
 );
+const correctedClubRows = parseCsv([
+  "Player;Club;Division",
+  "One;Bristol Rovers;Regional Div. West",
+  "Two;New York;Regional Div. West",
+  "Three;Charlotte FC;Regional Div. West",
+  "Four;LASK;Premier Division",
+  "Five;Lausanne;Regional Div. West",
+].join("\n"));
+assert.equal(rowGetter(correctedClubRows[0])("Division"), "Sky Bet Championship", "Bristol Rovers should be corrected to Sky Bet Championship");
+assert.equal(rowGetter(correctedClubRows[1])("Division"), "Major League Soccer", "New York should be corrected to Major League Soccer");
+assert.equal(rowGetter(correctedClubRows[2])("Division"), "Major League Soccer", "Charlotte FC should be corrected to Major League Soccer");
+assert.equal(rowGetter(correctedClubRows[3])("Division"), "Austrian Premier Division", "LASK should be corrected to Austrian Premier Division");
+assert.equal(rowGetter(correctedClubRows[4])("Division"), "Swiss Super League", "Lausanne should be corrected to Swiss Super League");
 assert.equal(
   dealFlag({ bestScore: 99, age: 21, actualValue: null, valueStatus: "Not For Sale" }, { freeAgentThreshold: 1 }),
   "Not For Sale",

@@ -2,6 +2,11 @@ import { mean, normalise, roleIdsFromPositionText } from "./utils.js";
 import { resolveLeague } from "./league-overrides.js";
 
 const CLUB_DIVISION_OVERRIDES = new Map([
+  ["bristolrovers", { division: "Sky Bet Championship", note: "Bristol Rovers division corrected to Sky Bet Championship from exported league value" }],
+  ["charlottefc", { division: "Major League Soccer", note: "Charlotte FC division corrected to Major League Soccer from exported league value" }],
+  ["lask", { division: "Austrian Premier Division", note: "LASK division corrected to Austrian Premier Division from exported league value" }],
+  ["lausanne", { division: "Swiss Super League", note: "Lausanne division corrected to Swiss Super League from exported league value" }],
+  ["newyork", { division: "Major League Soccer", note: "New York division corrected to Major League Soccer from exported league value" }],
   ["riotinto", { division: "No league data", note: "Rio Tinto division corrected to No league data from exported league value" }],
 ]);
 

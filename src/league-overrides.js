@@ -77,6 +77,7 @@ const LEAGUE_ALIASES = new Map([
   ["northernirishpremiership", "NIFL Premiership"],
   ["niflpremierleague", "NIFL Premiership"],
   ["niflpremiership", "NIFL Premiership"],
+  ["pkobpekstraklasa", "PKO Bank Polski Ekstraklasa"],
 ]);
 
 const BASED_IN_LEAGUE_ALIASES = new Map([
@@ -103,12 +104,16 @@ const BASED_IN_LEAGUE_ALIASES = new Map([
   ["premierdivision|norway", "Norwegian Premier Division"],
   ["premierdivision|arg", "Argentine Premier Division"],
   ["premierdivision|argentina", "Argentine Premier Division"],
+  ["premierdivision|aut", "Austrian Premier Division"],
+  ["premierdivision|austria", "Austrian Premier Division"],
   ["premierdivision|swe", "Swedish Premier Division"],
   ["premierdivision|sweden", "Swedish Premier Division"],
   ["premierleague|eng", "English Premier Division"],
   ["premierleague|england", "English Premier Division"],
   ["premierleague|por", "Portuguese Premier League"],
   ["premierleague|portugal", "Portuguese Premier League"],
+  ["premierleague|rus", "Russian Premier League"],
+  ["premierleague|russia", "Russian Premier League"],
   ["premierleague|uru", "Uruguayan First Division"],
   ["premierleague|uruguay", "Uruguayan First Division"],
   ["premierleague|ukr", "Ukrainian Premier League"],
