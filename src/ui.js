@@ -52,6 +52,7 @@ export function labelFor(col) {
   return {
     totalVfm: "TOTAL VFM",
     bestScore: "Score",
+    rawOutputScore: "Raw output",
     bestRole: "Role fit",
     matchedRoles: "Role scores",
     roleCount: "Roles",
@@ -141,7 +142,7 @@ export function formatCell(row, col) {
   if (col === "notes") return notesCell(row, value);
   if (col.startsWith("stat:")) return formatStatCell(value);
   if (["actualValue", "expectedValue", "actualWage", "expectedWage", "candidateValue"].includes(col)) return value ? money.format(value) : "";
-  if (["bestScore", "totalVfm", "valueRatio", "wageRatio", "strength", "squadBestScore", "squadScore", "benchmarkScore", "candidateScore", "scoreGap", "benchmarkGap", "candidateBenchmarkGap", "avgScore", "backupScore", "depthDrop", "roleSpread", "candidateDepthGap", "usableDepthCount", "depthTarget", "score", "keyScore", "preferredScore"].includes(col)) return value === null || value === undefined ? "" : fmt(value);
+  if (["bestScore", "rawOutputScore", "totalVfm", "valueRatio", "wageRatio", "strength", "squadBestScore", "squadScore", "benchmarkScore", "candidateScore", "scoreGap", "benchmarkGap", "candidateBenchmarkGap", "avgScore", "backupScore", "depthDrop", "roleSpread", "candidateDepthGap", "usableDepthCount", "depthTarget", "score", "keyScore", "preferredScore"].includes(col)) return value === null || value === undefined ? "" : fmt(value);
   if (["player", "dealFlag", "archetype", "upgradeCall", "action", "depthStatus", "recommendation"].includes(col)) return `<span class="${col === "dealFlag" ? flagClass(value) : ["upgradeCall", "action", "depthStatus", "recommendation"].includes(col) ? upgradeClass(value) : ""}">${escapeHtml(value ?? "")}</span>`;
   return escapeHtml(value ?? "");
 }

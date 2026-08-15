@@ -66,10 +66,12 @@ export function scoreRole(row, role, rowIndex = 0, options = {}) {
     }
     const resolvedLeague = resolveLeague(role, get("Division"), options.leagueFallback, leagueContext);
     const leagueStrength = Number(resolvedLeague.data?.strength) || 35;
-    const adjusted = ((sum / score.denominator) + 3) * (leagueStrength / 55) * 10;
+    const rawOutput = ((sum / score.denominator) + 3) * 10;
+    const adjusted = rawOutput * (leagueStrength / 55);
     return {
       label: score.label,
       score: adjusted,
+      rawOutput,
       coverage: weightSeen ? coverage / weightSeen : 0,
     };
   });
@@ -108,6 +110,7 @@ export function scoreRole(row, role, rowIndex = 0, options = {}) {
     scores,
     bestRole: best.label.replace(" Score", ""),
     bestScore: best.score,
+    rawOutputScore: best.rawOutput,
     coverage: best.coverage,
     actualValue,
     valueStatus: isNotForSaleValue(rawActualValue) ? "Not For Sale" : "",

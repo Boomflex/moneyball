@@ -1429,11 +1429,12 @@ function databaseScoreAuditPanel(player) {
     </div>
     <section class="audit-summary">
       <article><span>Score</span><strong>${fmt(player.bestScore)}</strong></article>
+      <article><span>Raw output</span><strong>${fmt(player.rawOutputScore)}</strong></article>
       <article><span>Total VFM</span><strong>${fmt(player.totalVfm)}</strong></article>
       <article><span>Coverage</span><strong>${escapeHtml(coverage)}</strong></article>
       <article><span>Deal</span><strong>${escapeHtml(player.dealFlag || "-")}</strong></article>
     </section>
-    <p class="lede">${escapeHtml(profile?.label || "Workbook score")} using ${escapeHtml(leagueNote)} league strength. Contributions show each metric's estimated effect on the final score.</p>
+    <p class="lede">${escapeHtml(profile?.label || "Workbook score")} using ${escapeHtml(leagueNote)} league strength. Raw output is the stat-only score before league adjustment.</p>
     ${table(rows, ["metric", "value", "benchmark", "goodLook", "weight", "contribution"], "audit-table", { sortable: false })}
   </section>`;
 }
@@ -1450,14 +1451,14 @@ function renderPlayerDatabase() {
   if (state.databaseDeal !== "All" && !dealOptions.includes(state.databaseDeal)) state.databaseDeal = "All";
 
   const databasePlayers = divisionPlayers.filter(databasePassesScoutFilters);
-  const columns = ["player", "bestRole", "matchedRoles", "division", "leagueBaseline", "age", "minutes", "bestScore", "goodLookFlags", "totalVfm", "valueRatio", "actualValue", "actualWage", "dealFlag", "scoutStatus", "priority", "notes"];
+  const columns = ["player", "bestRole", "matchedRoles", "division", "leagueBaseline", "age", "minutes", "bestScore", "rawOutputScore", "goodLookFlags", "totalVfm", "valueRatio", "actualValue", "actualWage", "dealFlag", "scoutStatus", "priority", "notes"];
   const fullRows = databaseRows(databasePlayers);
   const filteredRows = applyColumnFilters(fullRows, columns, state.databaseFilters);
   const rows = sortedRows(filteredRows);
   const selectedAudit = rows.find((item) => item.id === state.databaseAuditId) || rows[0] || null;
   state.databaseAuditId = selectedAudit?.id || null;
   const filterCount = activeDatabaseFilterCount();
-  const filterableColumns = ["age", "minutes", "bestScore", "goodLookFlags", "totalVfm", "valueRatio", "actualValue", "actualWage"];
+  const filterableColumns = ["age", "minutes", "bestScore", "rawOutputScore", "goodLookFlags", "totalVfm", "valueRatio", "actualValue", "actualWage"];
   const noteCount = basePlayers.filter((player) => player.notes).length;
 
   renderShell(`
@@ -1738,7 +1739,7 @@ function renderRoleSheets() {
   const sections = rolesWithRows().map((role) => {
     const rows = filteredPlayers().filter((item) => item.role === role.id);
     const statColumns = state.roleSheetMode === "detailed" ? allRoleStatColumns(role) : roleStatColumns(role, rows);
-    const columns = ["player", "division", "minutes", "age", "bestRole", "bestScore", ...statColumns.map(statColumnKey), "expectedValue", "actualValue", "valueRatio", "dealFlag"];
+    const columns = ["player", "division", "minutes", "age", "bestRole", "bestScore", "rawOutputScore", ...statColumns.map(statColumnKey), "expectedValue", "actualValue", "valueRatio", "dealFlag"];
     const avg = mean(rows.map((item) => item.bestScore));
     const filterableColumns = columns.filter((col) => !["player", "division", "bestRole", "dealFlag"].includes(col));
     const fullRoleRows = roleSheetRows(rows, statColumns);

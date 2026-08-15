@@ -345,6 +345,7 @@ assert.equal(sampleRows.length, 2, "sample CSV row count changed");
 assert.ok(samplePlayers.length > 0, "sample CSV should produce scored role entries");
 assert.equal(new Set(samplePlayers.map((player) => player.id)).size, samplePlayers.length, "scored players should have unique stable IDs");
 assert.ok(samplePlayers.every((player) => player.legacyId && player.id !== player.legacyId), "scored players should retain legacy IDs for saved scout records");
+assert.ok(samplePlayers.every((player) => Number.isFinite(player.rawOutputScore)), "scored players should expose raw output scores");
 for (const role of MODEL.roles) {
   const nationalLeague = role.leagues["Vanarama National League"];
   const nifl = role.leagues["NIFL Premiership"];
