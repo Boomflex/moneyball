@@ -2,11 +2,17 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { WORKBOOK_MODEL } from "../src/model.js";
 import { applyLeagueOverrides, resolveLeague } from "../src/league-overrides.js";
+import { bridgeRowsFromPayload, bridgeSnapshotUrl, cleanBridgeUrl } from "../src/fm26-bridge.js";
 import { analyzeImport, applySquadDivisionOverride, dominantDivisionForRows, inferImportRole, parseCsv, rowGetter } from "../src/importer.js";
 import { dealFlag, percentileForStat, recalcRows, valueForStat } from "../src/scoring.js";
 import { goodLookBand } from "../src/good-look.js";
 
 const MODEL = applyLeagueOverrides(WORKBOOK_MODEL);
+
+assert.equal(cleanBridgeUrl("http://127.0.0.1:8711/"), "http://127.0.0.1:8711", "FM26 bridge URL should be normalized");
+assert.equal(bridgeSnapshotUrl("http://127.0.0.1:8711/", "squad"), "http://127.0.0.1:8711/snapshot/squad", "FM26 squad bridge URL should be stable");
+assert.equal(bridgeRowsFromPayload({ rows: [{ Player: "One" }] }, parseCsv).length, 1, "FM26 bridge should accept JSON row payloads");
+assert.equal(bridgeRowsFromPayload({ csv: "Player\nOne" }, parseCsv)[0].Player, "One", "FM26 bridge should accept CSV payloads");
 
 const mixedSquadRows = [
   { Player: "First", Division: "Premier League" },

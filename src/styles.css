@@ -591,12 +591,62 @@ textarea {
 .panel,
 .dropzone,
 .schema-panel,
+.fm26-bridge-panel,
 .guide-card,
 .stats article,
 .selectors article,
 
 .primary-panel {
   background: rgba(9, 13, 29, .9);
+}
+
+.fm26-bridge-panel {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(70, 215, 167, .26);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+
+.fm26-bridge-panel label {
+  max-width: 680px;
+}
+
+.fm26-bridge-panel input {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+.fm26-bridge-panel .panel-head strong {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.fm26-bridge-panel .panel-head strong.good {
+  color: var(--green);
+}
+
+.fm26-bridge-panel .panel-head strong.warn {
+  color: var(--amber);
+}
+
+.bridge-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.bridge-auto-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: end;
+}
+
+.bridge-auto-row label:not(.check) {
+  min-width: 190px;
 }
 
 .dropzone {

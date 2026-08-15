@@ -1,6 +1,13 @@
 import { WORKBOOK_MODEL } from "./model.js";
 import { applyLeagueOverrides, resolveLeague } from "./league-overrides.js";
 import {
+  FM26_BRIDGE_DEFAULT_URL,
+  bridgeRowsFromPayload,
+  bridgeSnapshotLabel,
+  bridgeSnapshotUrl,
+  cleanBridgeUrl,
+} from "./fm26-bridge.js";
+import {
   analyzeImport,
   applySquadDivisionOverride,
   dominantDivisionForRows,
@@ -38,6 +45,7 @@ const SCOUT_STORAGE_KEY = "moneyball.scoutRecords.v1";
 const DATABASE_VIEWS_STORAGE_KEY = "moneyball.databaseViews.v1";
 const SQUAD_STORAGE_KEY = "moneyball.squadBaseline.v1";
 const BENCHMARK_SQUAD_STORAGE_KEY = "moneyball.benchmarkSquad.v1";
+const FM26_BRIDGE_STORAGE_KEY = "moneyball.fm26BridgeUrl.v1";
 const DATABASE_STATUSES = ["New", "Watch", "Scout", "Saved", "Ignore"];
 const DATABASE_PRIORITIES = ["", "A", "B", "C"];
 const ROLE_DEPTH_TARGETS = { GK: 2, CB: 4, FB: 4, MID: 6, Winger: 4, Striker: 3 };
@@ -45,6 +53,7 @@ const USABLE_DEPTH_DROP = 15;
 const BACKUP_DROP_WARN = 15;
 const BACKUP_DROP_BAD = 25;
 let initialStorageWarning = "";
+let fmBridgePollTimer = null;
 
 const model = applyLeagueOverrides(WORKBOOK_MODEL);
 const roles = model.roles;
@@ -97,6 +106,13 @@ const state = {
   roleFitSelectedPlayer: "",
   roleFitView: "Best roles",
   storageWarning: initialStorageWarning,
+  fmBridgeUrl: loadFmBridgeUrl(),
+  fmBridgeStatus: "Idle",
+  fmBridgeDetail: "No live bridge connected",
+  fmBridgeBusy: false,
+  fmBridgeAutoPull: false,
+  fmBridgeAutoKind: "recruitment",
+  fmBridgeLastSignature: "",
 };
 
 const tabs = [
@@ -114,7 +130,7 @@ function setTab(tab) {
   render();
 }
 
-function setRows(rows) {
+function setRows(rows, options = {}) {
   state.rows = rows;
   state.leagueFallback = "";
   refreshRecruitmentScores();
@@ -129,7 +145,7 @@ function setRows(rows) {
   state.databasePriority = "All";
   state.databaseDeal = "All";
   state.databaseAuditId = null;
-  state.activeTab = "Database";
+  state.activeTab = options.activeTab || "Database";
   render();
 }
 
@@ -294,6 +310,22 @@ function saveSquadBaseline() {
 
 function saveBenchmarkSquad() {
   saveStoredSquad(BENCHMARK_SQUAD_STORAGE_KEY, state.benchmarkSquad, "Benchmark squad could not be saved. Browser storage may be blocked or full.");
+}
+
+function loadFmBridgeUrl() {
+  try {
+    return cleanBridgeUrl(localStorage.getItem(FM26_BRIDGE_STORAGE_KEY) || FM26_BRIDGE_DEFAULT_URL);
+  } catch {
+    return FM26_BRIDGE_DEFAULT_URL;
+  }
+}
+
+function saveFmBridgeUrl() {
+  try {
+    localStorage.setItem(FM26_BRIDGE_STORAGE_KEY, cleanBridgeUrl(state.fmBridgeUrl));
+  } catch {
+    state.storageWarning = "FM26 bridge endpoint could not be saved in browser storage.";
+  }
 }
 
 function setSquadRows(rows, name = "Current squad") {
@@ -1072,6 +1104,8 @@ function restoreInputFocus(selector, caret) {
 }
 
 function renderImport() {
+  const bridgeBusy = state.fmBridgeBusy ? "disabled" : "";
+  const bridgeStatusClass = state.fmBridgeStatus === "Connected" ? "good" : state.fmBridgeStatus === "Error" ? "warn" : "";
   const content = `
     <section class="import-hero">
       <div class="hero-copy">
@@ -1102,6 +1136,31 @@ function renderImport() {
           ${roles.map((role) => `<details><summary>${role.id}<small>${role.rawHeaders.length} inputs / ${role.scoreColumns.length} scores</small></summary><p>${role.rawHeaders.join(", ")}</p></details>`).join("")}
         </div>
       </section>
+      <section class="fm26-bridge-panel">
+        <div class="panel-head compact">
+          <div><span>BepInEx bridge</span><h2>Connect FM26</h2></div>
+          <strong class="${bridgeStatusClass}">${escapeHtml(state.fmBridgeStatus)}</strong>
+        </div>
+        <label>Endpoint
+          <input id="fmBridgeUrl" type="url" value="${escapeHtml(state.fmBridgeUrl)}" spellcheck="false" />
+        </label>
+        <div class="bridge-actions">
+          <button class="primary" id="pullFmRecruitment" type="button" ${bridgeBusy}>Recruitment</button>
+          <button class="ghost" id="pullFmSquad" type="button" ${bridgeBusy}>Your squad</button>
+          <button class="ghost" id="pullFmBenchmark" type="button" ${bridgeBusy}>Benchmark</button>
+        </div>
+        <div class="bridge-auto-row">
+          <label class="check"><input id="fmBridgeAutoPull" type="checkbox" ${state.fmBridgeAutoPull ? "checked" : ""} /> Auto-pull latest export</label>
+          <label>Use as
+            <select id="fmBridgeAutoKind">
+              <option value="recruitment" ${state.fmBridgeAutoKind === "recruitment" ? "selected" : ""}>Recruitment</option>
+              <option value="squad" ${state.fmBridgeAutoKind === "squad" ? "selected" : ""}>Your squad</option>
+              <option value="benchmark" ${state.fmBridgeAutoKind === "benchmark" ? "selected" : ""}>Benchmark</option>
+            </select>
+          </label>
+        </div>
+        <p class="lede">${escapeHtml(state.fmBridgeDetail)}</p>
+      </section>
     </section>
   `;
   renderShell(content);
@@ -1121,6 +1180,7 @@ function renderImport() {
     importFile(file);
   });
   app.querySelector("#downloadTemplate")?.addEventListener("click", downloadCsvTemplate);
+  bindFmBridgeControls();
 }
 
 function downloadCsvTemplate() {
@@ -1137,6 +1197,101 @@ function importFile(file) {
   const reader = new FileReader();
   reader.onload = () => setRows(parseCsv(String(reader.result)));
   reader.readAsText(file);
+}
+
+function bindFmBridgeControls() {
+  const endpoint = app.querySelector("#fmBridgeUrl");
+  endpoint?.addEventListener("change", () => {
+    state.fmBridgeUrl = cleanBridgeUrl(endpoint.value);
+    saveFmBridgeUrl();
+    render();
+  });
+  app.querySelector("#pullFmRecruitment")?.addEventListener("click", () => pullFmBridgeSnapshot("recruitment"));
+  app.querySelector("#pullFmSquad")?.addEventListener("click", () => pullFmBridgeSnapshot("squad"));
+  app.querySelector("#pullFmBenchmark")?.addEventListener("click", () => pullFmBridgeSnapshot("benchmark"));
+  app.querySelector("#fmBridgeAutoPull")?.addEventListener("change", (event) => {
+    state.fmBridgeAutoPull = event.target.checked;
+    state.fmBridgeStatus = state.fmBridgeAutoPull ? "Watching" : "Idle";
+    state.fmBridgeDetail = state.fmBridgeAutoPull ? "Watching for the next FM26 export" : "Auto-pull stopped";
+    ensureFmBridgePolling();
+    render();
+  });
+  app.querySelector("#fmBridgeAutoKind")?.addEventListener("change", (event) => {
+    state.fmBridgeAutoKind = event.target.value;
+    render();
+  });
+}
+
+async function pullFmBridgeSnapshot(kind, options = {}) {
+  state.fmBridgeUrl = cleanBridgeUrl(app.querySelector("#fmBridgeUrl")?.value || state.fmBridgeUrl);
+  saveFmBridgeUrl();
+  state.fmBridgeBusy = true;
+  state.fmBridgeStatus = "Checking";
+  state.fmBridgeDetail = options.auto ? "New FM26 export detected; importing latest snapshot" : `Waiting for ${bridgeSnapshotUrl(state.fmBridgeUrl, kind)}`;
+  if (!options.silent) render();
+
+  try {
+    const response = await fetch(bridgeSnapshotUrl(state.fmBridgeUrl, kind), { cache: "no-store" });
+    const contentType = response.headers.get("content-type") || "";
+    const payload = contentType.includes("application/json") ? await response.json() : await response.text();
+    if (!response.ok) throw new Error(typeof payload === "string" ? payload : `Bridge returned HTTP ${response.status}`);
+    const rows = bridgeRowsFromPayload(payload, parseCsv);
+    if (!rows.length) throw new Error("Bridge snapshot did not contain any player rows");
+
+    const label = bridgeSnapshotLabel(payload, kind === "benchmark" ? "Benchmark squad" : kind === "squad" ? "Current squad" : "FM26 recruitment");
+    state.fmBridgeStatus = "Connected";
+    state.fmBridgeDetail = `${rows.length} rows received from ${label}${options.auto ? " via auto-pull" : ""}`;
+    state.fmBridgeBusy = false;
+    state.fmBridgeLastSignature = bridgeSignatureFromPayload(payload) || state.fmBridgeLastSignature;
+
+    if (kind === "squad") setSquadRows(rows, label);
+    else if (kind === "benchmark") setBenchmarkRows(rows, label);
+    else setRows(rows, { activeTab: "Role Sheets" });
+  } catch (error) {
+    state.fmBridgeBusy = false;
+    state.fmBridgeStatus = "Error";
+    state.fmBridgeDetail = error?.message || "FM26 bridge could not be reached";
+    render();
+  }
+}
+
+function bridgeSignatureFromPayload(payload) {
+  return String(payload?.screen || "");
+}
+
+function bridgeSignatureFromHealth(payload) {
+  return String(payload?.latest || "");
+}
+
+function ensureFmBridgePolling() {
+  if (!state.fmBridgeAutoPull) {
+    if (fmBridgePollTimer) {
+      clearInterval(fmBridgePollTimer);
+      fmBridgePollTimer = null;
+    }
+    return;
+  }
+  if (fmBridgePollTimer) return;
+  fmBridgePollTimer = setInterval(pollFmBridgeLatestExport, 3000);
+  pollFmBridgeLatestExport();
+}
+
+async function pollFmBridgeLatestExport() {
+  if (!state.fmBridgeAutoPull || state.fmBridgeBusy) return;
+  try {
+    const response = await fetch(`${cleanBridgeUrl(state.fmBridgeUrl)}/health`, { cache: "no-store" });
+    const payload = await response.json();
+    if (!response.ok || !payload?.ok) throw new Error(payload?.error || "Bridge health check failed");
+    const signature = bridgeSignatureFromHealth(payload);
+    if (!signature || signature === state.fmBridgeLastSignature) return;
+    state.fmBridgeLastSignature = signature;
+    await pullFmBridgeSnapshot(state.fmBridgeAutoKind, { auto: true, silent: true });
+  } catch (error) {
+    state.fmBridgeStatus = "Error";
+    state.fmBridgeDetail = error?.message || "Auto-pull could not reach the FM26 bridge";
+    state.fmBridgeBusy = false;
+    render();
+  }
 }
 
 function setRoleFitRows(rows) {
@@ -1899,6 +2054,7 @@ function bindTable() {
   }));
 }
 function render() {
+  ensureFmBridgePolling();
   if (state.activeTab === "Import") renderImport();
   else if (state.activeTab === "Database") renderPlayerDatabase();
   else if (state.activeTab === "Role Sheets") renderRoleSheets();
